@@ -1,0 +1,462 @@
+---
+title: "Midterm"
+author: "Janette Avelar"
+date: "5/2/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rio)
+library(tidyverse)
+library(MASS)
+library(psych)
+library(broom)
+library(reghelper)
+library(pwr)
+library(here)
+library(semPlot)
+library(lavaan)
+
+options(scipen = 999)
+
+q4 <- import(here("data", "First_day_survey.csv")) %>% 
+  janitor::clean_names()
+```
+
+## **Instructions:** This exam will be graded out of 50 points. So, please choose your own combination of
+problems to add up to 50 possible points. Extra credit up to 60 total points is allowed.
+
+Questions selected:  
+* Question 1 (10)
+* Question 2 (10)
+* Question 4 (20)
+
+## Question 1 (10 pts)
+
+**Question 1:** Students in 613 can be divided into three groups: those who own 1 computer, those who own 2 computers, and those who own 3 or more computers. The level of stats-related anxiety for five of those with 1 computer is: 4, 3, 4, 2, 3 (on a 5-point scale); the level of anxiety for five of those with 2 computers is: 4, 3, 3, 2, 3 (on the same scale); finally, the level of anxiety for five of those with 3 or more computers is: 2, 3, 2, 2, 3.  
+
+Write down the GLM equation to predict stats-related anxiety based on this grouping
+variable. Solve for the parameter vector (β) and the error vector (ε) by hand (showing all of your work). (Hint: for help on calculating the inverse of X, see Lecture 1, pp. 4.)  
+
+#### Step 1
+Write down the GLM equation: Y = XB + e where:  
+* Y = stats related anxiety  
+* X = type of computer owned  
+* B = predicted anxiety when the type of computer owned is our reference group  
+* e = error  
+
+In other words, Anxiety = PredAnxiety*CompType + error
+
+#### Step 2
+Specify our matrices and solve for B.  
+
+Y is the observed values of stats related anxiety:  
+\[Y =\begin{bmatrix}\\
+4 \\
+3 \\
+4 \\
+2 \\
+3 \\
+4 \\
+3 \\
+3 \\
+2 \\
+3 \\
+2 \\
+3 \\
+2 \\
+2 \\
+3 \\
+\end{bmatrix}
+\]
+
+X is dummy coded values for computer type where the reference group is students who own 1 computer.  
+
+\[X Design Matrix = \begin{bmatrix}\\
+1 & 0 & 0 \\
+1 & 0 & 0 \\
+1 & 0 & 0 \\
+1 & 0 & 0 \\
+1 & 0 & 0 \\
+0 & 1 & 0 \\
+0 & 1 & 0 \\
+0 & 1 & 0 \\
+0 & 1 & 0 \\
+0 & 1 & 0 \\
+0 & 0 & 1 \\
+0 & 0 & 1 \\
+0 & 0 & 1 \\
+0 & 0 & 1 \\
+0 & 0 & 1 \\
+\end{bmatrix}
+\]
+
+To solve for B, we need to multiply the inverse of X by Y.  
+
+I know, according to the matrix multiplication rules, that the inverse of X multiplied by itself will give us the identity matrix. And further, that in order to get that value it must be a 3x15 matrix. I'll begin by transposing to get a 3x15 matrix. I've shifted each row above into a column to transpose:  
+
+\[X' = \begin{bmatrix}\\
+1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 \\
+\end{bmatrix}
+\]
+
+I also know, according to the rules of matrix multiplication, that multiplying X and X' will make me multiply and sum so that I get a 3x3 matrix with 5's, rather than 1's, along the diagonal. So I'd need the resulting sum to equal 1, rather than 5. I can do this by dividing each 1 in the transposed matrix by 5.  
+
+\[X^-1 = \begin{bmatrix}\\
+1/5 & 1/5 & 1/5 & 1/5 & 1/5 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 1/5 & 1/5 & 1/5 & 1/5 & 1/5 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1/5 & 1/5 & 1/5 & 1/5 & 1/5 \\
+\end{bmatrix}
+\]
+
+Now I can solve for B by multiplying $X^-1*Y$ =
+
+\[B = \begin{bmatrix} \\
+(1/5*4)+(1/5*3)+(1/5*4)+(1/5*2)+(1/5*3)+(0*4)+(0*3)+(0*3)+(0*2)+(0*3)+(0*2)+(0*3)+(0*2)+(0*2)+(0*3) \\
+(0*4)+(0*3)+(0*4)+(0*2)+(0*3)+(1/5*4)+(1/5*3)+(1/5*3)+(1/5*2)+(1/5*3)+(0*2)+(0*3)+(0*2)+(0*2)+(0*3) \\
+(0*4)+(0*3)+(0*4)+(0*2)+(0*3)+(0*4)+(0*3)+(0*3)+(0*2)+(0*3)+(1/5*2)+(1/5*3)+(1/5*2)+(1/5*2)+(1/5*3) \\
+\end{bmatrix}
+\]
+==> \[B = \begin{bmatrix} \\
+(.8 + .6 + .8 + .4 + .6) = 3.2 \\
+(.8 + .6 + .6 + .4 + .6) = 3 \\
+(.4 + .6 + .4 + .4 + .6) = 2.4 \\
+\end{bmatrix}
+\]
+
+==> \[B = \begin{bmatrix}
+3.2 \\
+3 \\
+2.4 \\
+\end{bmatrix}
+\]
+
+#### Step 3: Solve for e.
+To solve for e, we need to solve the following formula: $e = Y - XB$  
+
+We'll begin with XB:  
+\[XB = \begin{bmatrix}
+(1*3.2)+(0*3)+(0*2.4) = 3.2 \\
+(1*3.2)+(0*3)+(0*2.4) = 3.2 \\
+(1*3.2)+(0*3)+(0*2.4) = 3.2 \\
+(1*3.2)+(0*3)+(0*2.4) = 3.2 \\
+(1*3.2)+(0*3)+(0*2.4) = 3.2 \\
+(0*3.2)+(1*3)+(0*2.4) = 3 \\
+(0*3.2)+(1*3)+(0*2.4) = 3 \\
+(0*3.2)+(1*3)+(0*2.4) = 3 \\
+(0*3.2)+(1*3)+(0*2.4) = 3 \\
+(0*3.2)+(1*3)+(0*2.4) = 3 \\
+(0*3.2)+(0*3)+(1*2.4) = 2.4 \\
+(0*3.2)+(0*3)+(1*2.4) = 2.4 \\
+(0*3.2)+(0*3)+(1*2.4) = 2.4 \\
+(0*3.2)+(0*3)+(1*2.4) = 2.4 \\
+(0*3.2)+(0*3)+(1*2.4) = 2.4 \\
+\end{bmatrix}
+\]
+==> \[XB = \begin{bmatrix}\\
+3.2 \\
+3.2 \\
+3.2 \\
+3.2 \\
+3.2 \\
+3 \\
+3 \\
+3 \\
+3 \\
+3 \\
+2.4 \\
+2.4 \\
+2.4 \\
+2.4 \\
+2.4 \\
+\end{bmatrix}
+\]
+
+Now we can subtract XB from Y:
+\[Y-XB = \begin{bmatrix} \\
+(4-3.2) = .8 \\
+(3-3.2) = -.2 \\
+(4-3.2) = .8 \\
+(2-3.2) = -1.2 \\
+(3-3.2) = -.2 \\
+(4-3) = 1 \\
+(3-3) = 0 \\
+(3-3) = 0 \\
+(2-3) = -1 \\
+(3-3) = 0 \\
+(2-2.4) = -.4 \\
+(3-2.4) = .6 \\
+(2-2.4) = -.4 \\
+(2-2.4) = -.4 \\
+(3-2.4) = .6 \\
+\end{bmatrix}
+\]
+
+Our final matrix for e is:
+\[e = \begin{bmatrix}\\
+.8 \\
+-.2 \\
+.8 \\
+-1.2 \\
+-.2 \\
+1 \\
+0 \\
+0 \\
+-1 \\
+0 \\
+-.4 \\
+.6 \\
+-.4 \\
+-.4 \\
+.6 \\
+\end{bmatrix}
+\]
+
+#### Step 4: Check our work using R
+
+```{r question 1 check}
+X <- matrix(data = c(1, 0, 0,
+                     1, 0, 0,
+                     1, 0, 0,
+                     1, 0, 0,
+                     1, 0, 0,
+                     0, 1, 0,
+                     0, 1, 0,
+                     0, 1, 0,
+                     0, 1, 0,
+                     0, 1, 0,
+                     0, 0, 1,
+                     0, 0, 1,
+                     0, 0, 1,
+                     0, 0, 1,
+                     0, 0, 1),
+            nrow = 15, ncol = 3, byrow = TRUE)
+
+Y <- matrix(data = c(4, 3, 4, 2, 3,
+                     4, 3, 3, 2, 3,
+                     2, 3, 2, 2, 3),
+            nrow = 15, ncol = 1, byrow = TRUE)
+
+MASS::ginv(X) #confirms my X' was correct
+
+B <- ginv(X)%*%Y
+B #confirms my B was correct
+
+e <- Y - (X%*%B)
+e #confirms my e was correct
+```
+
+## Question 2 (10 pts)
+
+**Question 2:** It turns out that the more statistics courses you have taken, the more computers you have destroyed out of frustraation. Ii would like to know the equation that relates the two variables so that I can predict the number of computers future students are likely to have broken based on how many stats courses they have taken.
+
+These two variables are stored in a datafile called `First_day_survey.csv`: `nStatsCourses` and `nCompBreak`. Using R code, run a regression predicting `nCompBreak` from `nStatsCourses`. Be sure to calculate the Bs (unstandardized coefficients), the SS-regression, the SS-error, the df-regression, the df-error, the F value for the regression model, and the p-value associated with that F value.
+
+#### Step 1
+Our first step is to specify X and Y, along with our parameter estimates.
+
+```{r Q2 Step 1}
+#import data file
+q2data <- import(here("data", "First_day_survey.csv")) %>% 
+  janitor::clean_names()
+#our Y = q2y or number of computers broken
+comp_break <- matrix(data = q2data$n_comp_break,
+                     nrow = 250, ncol = 1, byrow = TRUE)
+#our X = stats_exp or number of stats courses taken
+stats_exp <- matrix(data = c(rep(1, length(q2data$n_stats_courses)), q2data$n_stats_courses),
+                    nrow = 250, ncol = 2, byrow = FALSE)
+#we also need to find our parameters
+q2b <- ginv(stats_exp) %*% comp_break
+#we get a 2x1 matrix where [1,1] = intercept and [2,1] = slope
+q2int <- q2b[1,1]
+q2slope <- q2b[2,1]
+#we also need an error term for our formula
+q2e <- comp_break - (stats_exp%*%q2b)
+```
+
+#### Step 2
+Calculate the following terms:  
+* SS-regression  
+* SS-error  
+* df-regression  
+* df-error  
+
+```{r Q2 Step 2}
+#sum of squared total
+sst <- sum((q2y-mean(q2y))^2)
+#sum of squared error
+sse <- sum(q2e^2)
+#sum of squared regression
+ssr <- sst - sse
+```
+
+With the code above, we've determined our SS-total is 2028.64 and SS-error is 2021.78. These two values were used to calculate SS-regression, which is 6.86.
+
+We also know that df-regression is equal to the number of predictor variables (k) in our model, which means df-regression = 1. And df-error is equal to the number of our sample size - k - 1, which means df-error = 248.
+
+#### Step 3
+Calculate F-value and associated p-value.  
+
+Our formula for the F statistic is $F = \frac{MS_{regression}}{MS_{Error}}$, so we need to begin by calculating MS-regression and MS-error.
+
+```{r Q2 Step 3A}
+#assign values to df-regression and df-error for our formulas
+dfr <- 1
+dfe <- 248
+#find MS-regression = ssr/dfr
+msr <- ssr/dfr
+#find MS-error = sse/dfr
+mse <- sse/dfe
+#F = msr/mse
+f <- msr/mse
+```
+
+Our F-statistic = 0.003391903. Now we can get an associated p-value:
+
+```{r Q2 Step 3B}
+pf(f, dfr, dfe, lower.tail = FALSE)
+```
+
+Our resulting p-value is 0.3599472.
+
+#### Step 4
+Now we can check our work using `lm()` and `anova()`.
+
+```{r}
+q2mod <- lm(q2data$n_comp_break ~ q2data$n_stats_courses, data = q2data)
+anova(q2mod) #all my numbers matched up.
+```
+
+## Question 4 (20 points)
+
+**Question 4:** Using the survey data from the first day of class (First_day_survey.csv), I would like to test whether the type of computer you use (3 *categorical* groups: Mac (0), PC (1), or other (2); variable=`mac_pc`) interacts with the number of stats classes you’ve taken (*continuous* variable = `n_stats_courses`) to predict your continuous comfort with statistics (`comfort`): Does the effect of previous stats experience on comfort differ as a function of what kind of computer you use?  
+
+Center the appropriate variables, create the interaction term, and run a hierarchical regression predicting `comfort` from the two main effects (`mac_pc` and `n_stats_courses`) and their interaction. *Regardless of whether or not they are significant*, plot the simple slopes of stats experience on comfort for each type of computer (using a computer) and test the significance of at least one of them. Report all of the parameters and the R2 change test, and interpret your findings.
+
+#### Step 1 
+First we'll center the predictor variables.
+
+```{r q4 center}
+#we'll center the continuous predictor; not the categorical one
+q4 <- q4 %>% 
+  mutate(stats_ctr = n_stats_courses - mean(n_stats_courses, na.rm = TRUE),
+  #also factor mac_pc while we're here
+  mac_pc = factor(mac_pc,
+                  levels = c("0", "1", "2"),
+                  labels = c("Mac", "PC", "Other")))
+#check our work
+round(mean(q4$stats_ctr), 5) #mean is 0, we can be assured it's centered
+```
+
+#### Step 2
+Now we'll create the interaction term and run regression predicting `comfort`. A plot of the main effects is included below, with simple slopes color-coded for each group of computer users: Mac, PC, and Other.
+
+```{r q4 model}
+#make sure mac_pc is coded as a factor
+levels(q4$mac_pc) #3 levels = Mac, PC, Other
+comp_stats_model <- lm(comfort ~ mac_pc*stats_ctr, data = q4)
+summary(comp_stats_model)
+
+#plot main effects
+ggplot(data = q4, aes(stats_ctr, comfort, group = mac_pc, color=mac_pc)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  labs(x = "Stats Experience (Centered)",
+       y = "Comfort with Stats",
+       title = "Main Effects")
+```
+
+#### Step 3
+Now we can test our simple slopes, beginning by writing out our full regression formula:  
+
+$$\hat{Y}comfort = \beta_0 + \beta_1stats + \beta_2comp + \beta_3*\beta_1stats*\beta_2comp$$
+
+Our full formula helps inform our 3 decomposed subsequent formulas for Mac(0), PC(1), and Other(2).
+
+Mac formula: $$\hat{Y}comfort = \beta_0 + \beta_1stats$$  
+=> $$\hat{Y}comfort = 2.83917 + 0.13081*stats$$
+PC formula: $$\hat{Y}comfort = \beta_0 + \beta_1stats + \beta_2comp + \beta_3*\beta_1*stats*\beta_2comp$$  
+=> $$\hat{Y}comfort = 2.83917 + 0.13081*stats + 0.07157*1 + 0.16552*0.13081*stats*0.07157$$
+=> $$\hat{Y}comfort = 2.91074 + 0.13081*stats + 0.00154961*stats$$
+=> $$\hat{Y}comfort = 2.91074 + 0.1323596*stats$$
+Other formula: $$\hat{Y}comfort = \beta_0 + \beta_1stats - 0.06694 + \beta_3*\beta_1stats*-0.06694$$
+=> $$\hat{Y}comfort = 2.83917 + 0.13081*stats - 0.06694 -0.24846*\beta_1*stats*-0.06694$$
+=> $$\hat{Y}comfort = 2.77223 + 0.13081*stats - 0.01663191*stats$$
+=> $$\hat{Y}comfort = 2.77223 + 0.1141781*stats$$
+
+```{r q4 simple slopes significance tests}
+#First, run significance tests:
+#subset data
+pc_data = subset(q4, mac_pc == "PC")
+mac_data = subset(q4, mac_pc == "Mac")
+other_data = subset(q4, mac_pc == "Other")
+#run models for each group separately to test simple effects
+pc_model = lm(comfort ~ stats_ctr, data = pc_data) # PC users
+anova(pc_model) # PC summary
+mac_model = lm(comfort ~ stats_ctr, data = mac_data) # Mac users
+anova(mac_model) # Mac summary
+other_model = lm(comfort ~ stats_ctr, data = other_data) # Other users
+anova(other_model) # Other summary
+
+#Also need adjusted R^2 for each of these
+#Adjusted R^2 = SS/SS_Total
+pc_r2 <- 17.888/(17.888+64.758)
+mac_r2 <- 4.313/(4.313+141.513)
+other_r2 <- 0.1810/(0.1810+7.5882)
+
+#now we can build models to plot
+#assign coefficients to build models
+b0 = comp_stats_model$coefficients[1] #intercept
+b1 = comp_stats_model$coefficients[4] #predicted change with 1 SD stats course and mac as our ref group
+b2_pc = comp_stats_model$coefficients[2] #slope for pc users
+b2_other = comp_stats_model$coefficients[3] #slope for other users
+b3_pc = comp_stats_model$coefficients[5] #interaction for PC users
+b3_other = comp_stats_model$coefficients[6] #interaction for other users
+#coefficient check:
+comp_stats_model$coefficients
+
+#simple slope models
+#at mean stats experience
+pc_ss = (b0 + b2_pc) + (b2_pc*q4$stats_ctr + b3_pc*q4$stats_ctr)
+mac_ss = b0 + b1*(q4$stats_ctr)
+other_ss = (b0 + b2_other) + (b2_other*q4$stats_ctr + b3_other*q4$stats_ctr)
+#plot
+plot(q4$stats_ctr,pc_ss,type="l", col="green", lwd=3, 
+     xlab="Experience with Statistics (centered)", 
+     ylab="Comfort with Statistics",
+     xlim = c(-4, 8),
+     ylim = c(1, 9),
+     main = "Simple Slopes Interaction")
+lines(q4$n_stats_courses,mac_ss,type="l", col="black", lwd=3)
+lines(q4$n_stats_courses,other_ss,type="l", col="red", lwd=3)
+describe(q4$stats_ctr)
+legend(0, 7, c("PC Users", "Mac Users", "Other users"),
+       lty=c(1,1,1),
+       lwd=c(3,3,3),
+       col=c("green","black","red")
+)
+```
+
+The plot above shows the decomposed simple slope interactions for our model.
+
+#### Step 4: Report your findings
+
+A hierarchical regression analysis was run to examine the relationship between previous experience in statistics courses and type of computer (Mac, PC, or other) on students' comfort levels with statistics. Our analysis yielded a significant interaction, $F(5,244) = 5.199, p < 0.001$ but the model explained less than 1% of the variance, adjusted R^2 = 0.078.
+
+Follow-up simple slopes significance tests were run to determine the significance of experience for Mac users, PC users, and users of other computer types. For PC users, previous experience was significant, contributing an additional 1.37 points of comfort for each standard deviation of experience, $F(1,91) = 25.136, p < .001$ and the model explained 21.6% of the variance with an adjusted R^2 = 0.2164. For Mac users, there was no significant interaction with previous experience, $F(1,142) = 4.328, p = 0.393, adjusted R^2 = 0.0296$. For other computer users there was similarly no interaction with previous experience, $F(1,11) = 0.262, p = 0.619, adjusted R^2 = 0.023.
+
+## Question 6
+
+I would like to further understand the relationship between academic success and traditionalist attitudes. In my model, academic success is a latent factor indicated by overall GPA and expected grade in the class. Traditionalism is a latent factor that is explained by two other latent factors, gender preference and social dominance preference. Gender preference is indicated by items 26, 29, 31, 33, 35, 37, 39, 41, 42, 44, 45, 47, 49, 51, and 52. Social dominance preference is indicated by items 25, 27, 28, 30, 32, 34, 36, 38, 40, 43, 46, 48, and 50.
+
+A) Draw this factor model (by hand or using your favorite computer tool). It should have 4 latent factors: academic success, traditionalism, gender preference, and social dominance preference. In addition to the structural model (i.e., variances of and covariances among the latent factors), include all details relevant to the measurement
+model (i.e., the relationship between the indicators and the latent variables and the error terms of the indicators).
+
+
+
+B) Calculate the information necessary to compute this model: the covariance matrix of the indicators. How many unique observations are there? How many parameters need to be estimated by the model? How many degrees of freedom will this model have? Based on the 50:1 N:q rule, roughly how many subjects will be required to adequately measure this model?

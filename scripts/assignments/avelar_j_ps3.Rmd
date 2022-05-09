@@ -1,0 +1,190 @@
+---
+title: "Problem Set 3"
+author: "Janette Avelar"
+date: "4/27/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+```
+
+```{r library, include=FALSE}
+library(rio)
+library(here)
+library(psych)
+library(OpenMx)
+library(tidyverse)
+library(lavaan)
+# library(semPlot)
+
+q1data <- import(here("data", "PS3_Q1-3.RData"),
+                 setclass = "tibble")
+q4data <- import(here("data", "PS3_Q4.RData"),
+                 setclass = "tibble")
+```
+
+## Question 1
+
+**Run a components analysis on all 19 items. Be sure to generate the reproduced correlation matrix. Use principal components extraction to extract any factors with an eigenvalue greater than 1, and** *varimax* **orthogonal rotation.**  
+
+This is the original correlation matrix with heatmap visualization:
+
+```{r og cor mat}
+# get a correlation matrix
+# focus on 19 items--therefore, we'll drop first 2 cols
+q1data_mod <- q1data %>% 
+  select(c(3:21))
+# create cor
+og_cor <- data.frame(cor(q1data_mod, use = "pairwise.complete.obs"))
+
+round(og_cor, 2)
+
+# create a heatmap to visualize
+
+## convert the correlation matrix to long format
+og_cor_long <- og_cor %>%
+  rownames_to_column(var = "var1") %>%
+  gather(key = "var2", value = "corr", -var1)
+
+# plot 
+ggplot(data = og_cor_long, aes(x = var1, y = var2, fill = corr)) + 
+  geom_tile()
+```
+
+Next, we'll run an unrotated PCA and extract eigenvalues.
+
+```{r unrotated PCA}
+# note we have NA values
+# useful to figure out where they are in our modified dataset to figure out what to do with them
+
+# first let's figure out how many
+sum(is.na(q1data_mod)) #76 NAs
+#that's a lot of missing values... are they full rows or individual observations?
+which(is.na(q1data_mod))
+#from cursory look, looks like the missing NAs are full rows
+#I've elected to drop them
+q1data_mod <- q1data_mod %>% 
+  na.omit()
+
+# now we can run PCA
+pca <- princomp(q1data_mod, cor = TRUE)
+
+# scree plot to visualize what's happening
+plot(pca, type = "lines", main = "Scree Plot")
+
+# extract eigenvalues:
+eigens <- eigen(og_cor)
+eigval <- eigens$values
+eigvec <- eigens$vectors
+```
+
+At first glance, from the scree plot, it looks like we may have 5 components that explain most of the variance. However, only 4 of these have eigenvalues greater than 1.
+
+The next step is to calculate our weighted component loadings.
+
+```{r weighted loadings}
+# Components 1-4 (eigval > 1)
+pca$loadings[,1:4]
+
+# Compute weighted loadings: 
+# Weighted loadings = loadings * sqrt(eigenvalue)
+loadings <- pca$loadings[,1:4]
+
+# sqrt of the variance/eigenvalue
+weights <- vec2diag(pca$sdev[1:4]) 
+# remember: Multiplying by this matrix = multiplying each column of your loadings by sdev.
+
+# component loadings 
+loadings[, 1:4] %*% weights
+
+loadings(principal(og_cor, nfactors = 19, rotate = "none"))
+```
+
+With the loadings calculated, we can reproduce our correlation matrix.
+
+```{r rep cor mat}
+# first multiply our eigenvectors and eigenvalues by t()
+rep_cor <- round(eigvec[,1:4] %*% diag(eigens$values[1:4]) %*% t(eigvec[,1:4]), 2)
+# extract residuals
+# og cor - 4 best eigens
+resid_cor <- round(og_cor - rep_cor, 2)
+resid_cor
+```
+
+We now have our loadings from the first 4 vectors, corresponding to 4 components that explain the most variance (eigvalues > 1). Now we want to use this to consider our data, so we'll rotate using varimax orthogonal rotation.
+
+```{r rotate orthog}
+# specifying varimax
+pca_var <- principal(q1data_mod, rotate = "varimax", nfactors = 4, missing = TRUE)
+summary(pca_var)
+pca_var$loadings
+pca_var$residual
+
+# calculating variance explained
+round(eigens$values[1:4] / sum(eigens$values[1:4]), 4)
+```
+
+**How many components emerge, and how much variance do they explain all together?**
+We had 4 components emerge, explaining 38.6%, 32.59%, 15.72%, and 13.09% of the variance respectively. If we add that up, our 4 components explain 99% of the variance.
+
+**Are there any residual correlations (i.e., the difference between observed and reproduced) that are large (e.g., >0.2)?**
+
+Yes. There are residual correlations greater than .2, all of which occur along the diagonal when the individual item is correlated with itself. However, this isn't meaningful to interpretation.
+
+**Do they tend to cluster on one or the other component?**
+
+There is one residual correlation of -.21 between items basf1 and basf3. When looking at the component loadings, these items mapped onto RC4 and RC3, which correspond to reward seeking and fun seeking, respectively.
+
+**Based on the component loadings in the rotated solution, label each of the components.**  
+* Component 1 (RC2) = Avoidant Behaviors (Avoidant + Opposite Fun/Drive)
+* Component 2 (RC1) = Drive (Drive + Mostly not Avoidant + Some Reward/Fun)  
+* Component 3 (RC4) = Reward Seeking (Reward + Some Drive)  
+* Component 4 (RC3) = Fun Seeking (Fun + Some Drive + Opposite Avoidant)  
+
+
+## Question 4
+
+**Context:** A researcher hypothesizes that fluid intelligence is composed of two underlying factors:  
+* Sequential processing  
+* Simultaneous processing
+She collected 3 measures of the first and 5 measures of the second, using 200 participants.
+
+**Using R, run a basic CFA model whereby `sequential` is indicated by the first 3 items (`handmov`, `numbrec`, and `wordord`) and `simultaneous` is indicated by the last 5 items (`gesclos`, `triangle`, `spatmem`, `matanalg`, and `photser`).**
+
+```{r CFA}
+#establish our model
+model <- '
+SEQ  =~ handmov + numbrec + wordord
+SIM =~ gesclos + triangle + spatmem + matanalg + photser
+
+SEQ ~~ SIM
+'
+fit <- cfa(model, sample.cov = q4data, sample.nobs = 200)
+summary(fit, fit.measures = TRUE)
+```
+
+
+**Report all the path weights (with SEs):**  
+From `sequential`:  
+* handmov 1.000  
+* numbrec 1.147(0.181)  
+* wordord 1.388(0.219)  
+
+From `simultaneous`:  
+* gesclos 1.000  
+* triangle 1.445(0.227)  
+* spatmem 2.029(0.335)  
+* matanalg 1.212(0.212)  
+* photser 1.727(0.265)
+
+**Report the covariance between the factors:**  
+1.271(0.324)
+
+**Report (any) one fit index:**
+Comparative Fit Index (CFI) = 0.959
+
+*Note:* I tried to install the {semPlots} package, but it kept crashing RStudio for me. Once I got it to stop doing that, it kept prompting me to install {igraphs} which I did multiple times but still couldn't get semPlots to open. Are there any other alternatives you know of to plot these types of models using a different package and/or any tips you can give me if other students have run into this issue?

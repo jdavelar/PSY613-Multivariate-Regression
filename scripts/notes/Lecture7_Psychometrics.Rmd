@@ -1,0 +1,82 @@
+---
+title: "Lecture 7 - Psychometrics"
+author: "ETB"
+date: "4/15/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Some useful libraries
+
+You'll probably want to put these in your packages list...
+
+```{r libaries}
+# Required librarys for alpha() and read.spss()
+library(ggplot2)
+library(psych)
+library(foreign)
+library(Matrix)
+
+```
+
+## Scale reliability
+
+How to do the standard reliability stuff in R
+
+```{r basics}
+# Get the data, the relevant variables are in the first 8 columns
+
+setwd("/Users/Berkman/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture data")
+data = read.spss("Lecture7_psychometrics_extraversion.sav", to.data.frame=TRUE)
+data <- data[,1:8]
+
+summary(data)   # OK
+describe(data)  # Better!!
+
+# Use ggplot to look at histograms of the first two items
+ggplot(data=data, aes(data$v1)) + geom_histogram(breaks=seq(1, 5, by=1), col="black", fill="gray")
+ggplot(data=data, aes(data$v2)) + geom_histogram(breaks=seq(1, 5, by=1), col="black", fill="gray")
+table(data$v2)  # Descriptives of item 2
+```
+
+Looks like someone is positively skewed!
+
+```{r build the scale}
+
+keys = c(1,-1,1,-1,1, -1, 1, 1)  #reverse the 2nd, 4th, and 6th items
+dataRev <- reverse.code(keys,data,mini=rep(1,8),maxi=rep(5,8))  # The handy reverse.code() function from psych
+
+BFIe = rowMeans(dataRev)  # From the matrix package. Simple mean of the 8 columns for each subject.
+BFIePOMP = 100*(rowMeans(dataRev)-1)/4   # Percentage of Maximum Possible (POMP)
+
+df = data.frame(BFIe, BFIePOMP)  # Put into df for plotting
+ggplot(data=df, aes(BFIePOMP)) + geom_histogram(breaks=seq(0, 100, by=5), col="black", fill="gray")
+
+psych::alpha(data)   # This will remind you that some of the items appear to be reverse-coded
+psych::alpha(dataRev) # This will produce the correct result
+```
+
+
+## Interrater reliability
+
+How to calculate the "ICC" and other indices of how reliable raters are with each other
+
+```{r interrater}
+data = read.spss("Lecture7_psychometrics_extraversionICC.sav", to.data.frame=TRUE)
+data <- data[,2:9]
+
+# Calculate the ICC
+ICC(data)
+
+# Calculate the alpha (for comparison)
+psych::alpha(data)
+
+```
