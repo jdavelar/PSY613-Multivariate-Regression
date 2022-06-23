@@ -1,0 +1,9 @@
+	HandMov	NumRec	WordOrd	Gestalt	Triangles	SpatialMem	MatrixAn	PhotoSer
+HandMov	1	0.39	0.35	0.21	0.32	0.4	0.39	0.39
+NumRec	0.39	1	0.67	0.11	0.27	0.29	0.32	0.29
+WordOrd	0.35	0.67	1	0.16	0.29	0.28	0.3	0.37
+Gestalt	0.21	0.11	0.16	1	0.38	0.3	0.31	0.42
+Triangles	0.32	0.27	0.29	0.38	1	0.47	0.42	0.58
+SpatialMem	0.4	0.29	0.28	0.3	0.47	1	0.41	0.51
+MatrixAn	0.39	0.32	0.3	0.31	0.42	0.41	1	0.42
+PhotoSer	0.39	0.29	0.37	0.42	0.58	0.51	0.42	1
