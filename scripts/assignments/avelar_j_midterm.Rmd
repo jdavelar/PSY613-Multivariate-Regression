@@ -17,44 +17,45 @@ library(broom)
 library(reghelper)
 library(pwr)
 library(here)
-library(semPlot)
-library(lavaan)
 
 options(scipen = 999)
 
 q4 <- import(here("data", "First_day_survey.csv")) %>% 
   janitor::clean_names()
 ```
+\setcounter{MaxMatrixCols}{20}
 
-## **Instructions:** This exam will be graded out of 50 points. So, please choose your own combination of
+## Instructions: 
+
+This exam will be graded out of 50 points. So, please choose your own combination of
 problems to add up to 50 possible points. Extra credit up to 60 total points is allowed.
 
 Questions selected:  
-* Question 1 (10)
-* Question 2 (10)
-* Question 4 (20)
+* Question 1 (10)  
+* Question 2 (10)  
+* Question 3 (20)  
+* Question 4 (20)  
 
 ## Question 1 (10 pts)
 
-**Question 1:** Students in 613 can be divided into three groups: those who own 1 computer, those who own 2 computers, and those who own 3 or more computers. The level of stats-related anxiety for five of those with 1 computer is: 4, 3, 4, 2, 3 (on a 5-point scale); the level of anxiety for five of those with 2 computers is: 4, 3, 3, 2, 3 (on the same scale); finally, the level of anxiety for five of those with 3 or more computers is: 2, 3, 2, 2, 3.  
+*Students in 613 can be divided into three groups: those who own 1 computer, those who own 2 computers, and those who own 3 or more computers. The level of stats-related anxiety for five of those with 1 computer is: 4, 3, 4, 2, 3 (on a 5-point scale); the level of anxiety for five of those with 2 computers is: 4, 3, 3, 2, 3 (on the same scale); finally, the level of anxiety for five of those with 3 or more computers is: 2, 3, 2, 2, 3.*  
 
-Write down the GLM equation to predict stats-related anxiety based on this grouping
-variable. Solve for the parameter vector (β) and the error vector (ε) by hand (showing all of your work). (Hint: for help on calculating the inverse of X, see Lecture 1, pp. 4.)  
+*Write down the GLM equation to predict stats-related anxiety based on this grouping variable. Solve for the parameter vector ($\beta$) and the error vector ($\epsilon$) by hand (showing all of your work). (Hint: for help on calculating the inverse of X, see Lecture 1, pp. 4.)*  
 
-#### Step 1
-Write down the GLM equation: Y = XB + e where:  
+#### Step 1:  Write down the GLM equation 
+  
+Y = XB + e where:  
 * Y = stats related anxiety  
 * X = type of computer owned  
 * B = predicted anxiety when the type of computer owned is our reference group  
 * e = error  
 
-In other words, Anxiety = PredAnxiety*CompType + error
+In other words, $$Anxiety = PredAnxiety*CompType + error$$
 
-#### Step 2
-Specify our matrices and solve for B.  
+#### Step 2:  Specify our matrices and solve for B. 
 
 Y is the observed values of stats related anxiety:  
-\[Y =\begin{bmatrix}\\
+\[Y =\begin{bmatrix}
 4 \\
 3 \\
 4 \\
@@ -75,7 +76,7 @@ Y is the observed values of stats related anxiety:
 
 X is dummy coded values for computer type where the reference group is students who own 1 computer.  
 
-\[X Design Matrix = \begin{bmatrix}\\
+\[X Design Matrix = \begin{bmatrix}
 1 & 0 & 0 \\
 1 & 0 & 0 \\
 1 & 0 & 0 \\
@@ -98,7 +99,7 @@ To solve for B, we need to multiply the inverse of X by Y.
 
 I know, according to the matrix multiplication rules, that the inverse of X multiplied by itself will give us the identity matrix. And further, that in order to get that value it must be a 3x15 matrix. I'll begin by transposing to get a 3x15 matrix. I've shifted each row above into a column to transpose:  
 
-\[X' = \begin{bmatrix}\\
+\[X' = \begin{bmatrix}
 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 & 0 & 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 & 1 & 1 & 1 & 1 \\
@@ -107,7 +108,7 @@ I know, according to the matrix multiplication rules, that the inverse of X mult
 
 I also know, according to the rules of matrix multiplication, that multiplying X and X' will make me multiply and sum so that I get a 3x3 matrix with 5's, rather than 1's, along the diagonal. So I'd need the resulting sum to equal 1, rather than 5. I can do this by dividing each 1 in the transposed matrix by 5.  
 
-\[X^-1 = \begin{bmatrix}\\
+\[X^-1 = \begin{bmatrix}
 1/5 & 1/5 & 1/5 & 1/5 & 1/5 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 & 0 & 1/5 & 1/5 & 1/5 & 1/5 & 1/5 & 0 & 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 1/5 & 1/5 & 1/5 & 1/5 & 1/5 \\
@@ -116,13 +117,13 @@ I also know, according to the rules of matrix multiplication, that multiplying X
 
 Now I can solve for B by multiplying $X^-1*Y$ =
 
-\[B = \begin{bmatrix} \\
+\[B = \begin{bmatrix}
 (1/5*4)+(1/5*3)+(1/5*4)+(1/5*2)+(1/5*3)+(0*4)+(0*3)+(0*3)+(0*2)+(0*3)+(0*2)+(0*3)+(0*2)+(0*2)+(0*3) \\
 (0*4)+(0*3)+(0*4)+(0*2)+(0*3)+(1/5*4)+(1/5*3)+(1/5*3)+(1/5*2)+(1/5*3)+(0*2)+(0*3)+(0*2)+(0*2)+(0*3) \\
 (0*4)+(0*3)+(0*4)+(0*2)+(0*3)+(0*4)+(0*3)+(0*3)+(0*2)+(0*3)+(1/5*2)+(1/5*3)+(1/5*2)+(1/5*2)+(1/5*3) \\
 \end{bmatrix}
 \]
-==> \[B = \begin{bmatrix} \\
+==> \[B = \begin{bmatrix}
 (.8 + .6 + .8 + .4 + .6) = 3.2 \\
 (.8 + .6 + .6 + .4 + .6) = 3 \\
 (.4 + .6 + .4 + .4 + .6) = 2.4 \\
@@ -136,8 +137,10 @@ Now I can solve for B by multiplying $X^-1*Y$ =
 \end{bmatrix}
 \]
 
-#### Step 3: Solve for e.
-To solve for e, we need to solve the following formula: $e = Y - XB$  
+#### Step 3: Solve for e.  
+  
+To solve for e, we need to solve the following formula: 
+$$e = Y - XB$$ 
 
 We'll begin with XB:  
 \[XB = \begin{bmatrix}
@@ -158,7 +161,8 @@ We'll begin with XB:
 (0*3.2)+(0*3)+(1*2.4) = 2.4 \\
 \end{bmatrix}
 \]
-==> \[XB = \begin{bmatrix}\\
+
+==> \[XB = \begin{bmatrix}
 3.2 \\
 3.2 \\
 3.2 \\
@@ -178,7 +182,7 @@ We'll begin with XB:
 \]
 
 Now we can subtract XB from Y:
-\[Y-XB = \begin{bmatrix} \\
+\[Y-XB = \begin{bmatrix}
 (4-3.2) = .8 \\
 (3-3.2) = -.2 \\
 (4-3.2) = .8 \\
@@ -198,7 +202,7 @@ Now we can subtract XB from Y:
 \]
 
 Our final matrix for e is:
-\[e = \begin{bmatrix}\\
+\[e = \begin{bmatrix}
 .8 \\
 -.2 \\
 .8 \\
@@ -217,7 +221,7 @@ Our final matrix for e is:
 \end{bmatrix}
 \]
 
-#### Step 4: Check our work using R
+#### Step 4:  Check our work using R.  
 
 ```{r question 1 check}
 X <- matrix(data = c(1, 0, 0,
@@ -251,13 +255,14 @@ e <- Y - (X%*%B)
 e #confirms my e was correct
 ```
 
-## Question 2 (10 pts)
+## Question 2 (10 pts)  
 
-**Question 2:** It turns out that the more statistics courses you have taken, the more computers you have destroyed out of frustraation. Ii would like to know the equation that relates the two variables so that I can predict the number of computers future students are likely to have broken based on how many stats courses they have taken.
+*It turns out that the more statistics courses you have taken, the more computers you have destroyed out of frustration. Ii would like to know the equation that relates the two variables so that I can predict the number of computers future students are likely to have broken based on how many stats courses they have taken.*  
 
-These two variables are stored in a datafile called `First_day_survey.csv`: `nStatsCourses` and `nCompBreak`. Using R code, run a regression predicting `nCompBreak` from `nStatsCourses`. Be sure to calculate the Bs (unstandardized coefficients), the SS-regression, the SS-error, the df-regression, the df-error, the F value for the regression model, and the p-value associated with that F value.
+*These two variables are stored in a datafile called `First_day_survey.csv`: `nStatsCourses` and `nCompBreak`. Using R code, run a regression predicting `nCompBreak` from `nStatsCourses`. Be sure to calculate the Bs (unstandardized coefficients), the SS-regression, the SS-error, the df-regression, the df-error, the F value for the regression model, and the p-value associated with that F value.*  
 
-#### Step 1
+#### Step 1:  Specify X, Y, and Parameters   
+
 Our first step is to specify X and Y, along with our parameter estimates.
 
 ```{r Q2 Step 1}
@@ -279,7 +284,8 @@ q2slope <- q2b[2,1]
 q2e <- comp_break - (stats_exp%*%q2b)
 ```
 
-#### Step 2
+#### Step 2:  Define necessary terms  
+
 Calculate the following terms:  
 * SS-regression  
 * SS-error  
@@ -288,7 +294,7 @@ Calculate the following terms:
 
 ```{r Q2 Step 2}
 #sum of squared total
-sst <- sum((q2y-mean(q2y))^2)
+sst <- sum((comp_break-mean(comp_break))^2)
 #sum of squared error
 sse <- sum(q2e^2)
 #sum of squared regression
@@ -299,7 +305,8 @@ With the code above, we've determined our SS-total is 2028.64 and SS-error is 20
 
 We also know that df-regression is equal to the number of predictor variables (k) in our model, which means df-regression = 1. And df-error is equal to the number of our sample size - k - 1, which means df-error = 248.
 
-#### Step 3
+#### Step 3:  F-value & p-value  
+
 Calculate F-value and associated p-value.  
 
 Our formula for the F statistic is $F = \frac{MS_{regression}}{MS_{Error}}$, so we need to begin by calculating MS-regression and MS-error.
@@ -324,24 +331,55 @@ pf(f, dfr, dfe, lower.tail = FALSE)
 
 Our resulting p-value is 0.3599472.
 
-#### Step 4
+#### Step 4:  Check our work  
+
 Now we can check our work using `lm()` and `anova()`.
 
-```{r}
+```{r Q2 Step 4}
 q2mod <- lm(q2data$n_comp_break ~ q2data$n_stats_courses, data = q2data)
 anova(q2mod) #all my numbers matched up.
 ```
 
+## Question 3 (20 points)
+
+*Run a simulation demonstrating the effect of sample size on correlation. Use a range of sample sizes from N=2 to N=500. For each different sample size, draw a sample from a random normal distribution (use the `rnorm()` function). Let that sample be your DV. Then create an IV that is equal to your DV plus some random noise (again using `rnorm()`). If the SD of your random noise is the same as the SD of your DV, the "true" correlation between the DV and IV should be 0.5. Calculate what the correlation is between your IV and DV for each sample size. Plot the correlations as a function of sample size.*  
+
+```{r Q3, fig.dim = c(8.6)}
+set.seed(12345)
+# Set iterations
+iter <- 1000
+# Set sample sizes
+sample_sizes = c(2, 5, 20, 40, 50, 100, 200, 400, 500)
+cors <- rep(NA_real_, 9)
+
+# Pull 1000x over 12 sample sizes, create DV and IV from each, save correlation
+for (i in 1:length(sample_sizes)) { #looping over each sample size
+  # Create vectors to save samples
+  DV      <- rnorm(n = sample_sizes[i], mean = 50, sd = 20) # Get sample of specified sample
+  IV      <- DV + rnorm(n = sample_sizes[i], mean = 10, sd = 20)
+  cors[i] <- cor(DV, IV, use = "pairwise.complete.obs")
+
+}
+plot(x = sample_sizes, y = cors, 
+     type = "b",
+     ylim = c(-1, 1),
+     main = "Correlation as a Function of \n 2 Normally Distrubuted Variables",
+     xlab = "Sample Size",
+     ylab = "Correlation")
+```
+
+
 ## Question 4 (20 points)
 
-**Question 4:** Using the survey data from the first day of class (First_day_survey.csv), I would like to test whether the type of computer you use (3 *categorical* groups: Mac (0), PC (1), or other (2); variable=`mac_pc`) interacts with the number of stats classes you’ve taken (*continuous* variable = `n_stats_courses`) to predict your continuous comfort with statistics (`comfort`): Does the effect of previous stats experience on comfort differ as a function of what kind of computer you use?  
+*Using the survey data from the first day of class (First_day_survey.csv), I would like to test whether the type of computer you use (3 categorical groups: Mac (0), PC (1), or other (2); variable=`mac_pc`) interacts with the number of stats classes you’ve taken (continuous variable = `n_stats_courses`) to predict your continuous comfort with statistics (`comfort`): Does the effect of previous stats experience on comfort differ as a function of what kind of computer you use?*  
 
-Center the appropriate variables, create the interaction term, and run a hierarchical regression predicting `comfort` from the two main effects (`mac_pc` and `n_stats_courses`) and their interaction. *Regardless of whether or not they are significant*, plot the simple slopes of stats experience on comfort for each type of computer (using a computer) and test the significance of at least one of them. Report all of the parameters and the R2 change test, and interpret your findings.
+*Center the appropriate variables, create the interaction term, and run a hierarchical regression predicting `comfort` from the two main effects (`mac_pc` and `n_stats_courses`) and their interaction. **Regardless of whether or not they are significant**, plot the simple slopes of stats experience on comfort for each type of computer (using a computer) and test the significance of at least one of them. Report all of the parameters and the R2 change test, and interpret your findings.*
 
-#### Step 1 
+#### Step 1: Centering  
+
 First we'll center the predictor variables.
 
-```{r q4 center}
+```{r Q4 Step 1 - Center}
 #we'll center the continuous predictor; not the categorical one
 q4 <- q4 %>% 
   mutate(stats_ctr = n_stats_courses - mean(n_stats_courses, na.rm = TRUE),
@@ -353,10 +391,11 @@ q4 <- q4 %>%
 round(mean(q4$stats_ctr), 5) #mean is 0, we can be assured it's centered
 ```
 
-#### Step 2
+#### Step 2:  Run regression  
+
 Now we'll create the interaction term and run regression predicting `comfort`. A plot of the main effects is included below, with simple slopes color-coded for each group of computer users: Mac, PC, and Other.
 
-```{r q4 model}
+```{r Q4 Step 2 - model}
 #make sure mac_pc is coded as a factor
 levels(q4$mac_pc) #3 levels = Mac, PC, Other
 comp_stats_model <- lm(comfort ~ mac_pc*stats_ctr, data = q4)
@@ -371,7 +410,8 @@ ggplot(data = q4, aes(stats_ctr, comfort, group = mac_pc, color=mac_pc)) +
        title = "Main Effects")
 ```
 
-#### Step 3
+#### Step 3:  Test simple slopes  
+
 Now we can test our simple slopes, beginning by writing out our full regression formula:  
 
 $$\hat{Y}comfort = \beta_0 + \beta_1stats + \beta_2comp + \beta_3*\beta_1stats*\beta_2comp$$
@@ -389,7 +429,7 @@ Other formula: $$\hat{Y}comfort = \beta_0 + \beta_1stats - 0.06694 + \beta_3*\be
 => $$\hat{Y}comfort = 2.77223 + 0.13081*stats - 0.01663191*stats$$
 => $$\hat{Y}comfort = 2.77223 + 0.1141781*stats$$
 
-```{r q4 simple slopes significance tests}
+```{r Q4 Step 3 - simple slopes significance tests}
 #First, run significance tests:
 #subset data
 pc_data = subset(q4, mac_pc == "PC")
@@ -444,19 +484,8 @@ legend(0, 7, c("PC Users", "Mac Users", "Other users"),
 
 The plot above shows the decomposed simple slope interactions for our model.
 
-#### Step 4: Report your findings
+#### Step 4: Report your findings  
 
 A hierarchical regression analysis was run to examine the relationship between previous experience in statistics courses and type of computer (Mac, PC, or other) on students' comfort levels with statistics. Our analysis yielded a significant interaction, $F(5,244) = 5.199, p < 0.001$ but the model explained less than 1% of the variance, adjusted R^2 = 0.078.
 
 Follow-up simple slopes significance tests were run to determine the significance of experience for Mac users, PC users, and users of other computer types. For PC users, previous experience was significant, contributing an additional 1.37 points of comfort for each standard deviation of experience, $F(1,91) = 25.136, p < .001$ and the model explained 21.6% of the variance with an adjusted R^2 = 0.2164. For Mac users, there was no significant interaction with previous experience, $F(1,142) = 4.328, p = 0.393, adjusted R^2 = 0.0296$. For other computer users there was similarly no interaction with previous experience, $F(1,11) = 0.262, p = 0.619, adjusted R^2 = 0.023.
-
-## Question 6
-
-I would like to further understand the relationship between academic success and traditionalist attitudes. In my model, academic success is a latent factor indicated by overall GPA and expected grade in the class. Traditionalism is a latent factor that is explained by two other latent factors, gender preference and social dominance preference. Gender preference is indicated by items 26, 29, 31, 33, 35, 37, 39, 41, 42, 44, 45, 47, 49, 51, and 52. Social dominance preference is indicated by items 25, 27, 28, 30, 32, 34, 36, 38, 40, 43, 46, 48, and 50.
-
-A) Draw this factor model (by hand or using your favorite computer tool). It should have 4 latent factors: academic success, traditionalism, gender preference, and social dominance preference. In addition to the structural model (i.e., variances of and covariances among the latent factors), include all details relevant to the measurement
-model (i.e., the relationship between the indicators and the latent variables and the error terms of the indicators).
-
-
-
-B) Calculate the information necessary to compute this model: the covariance matrix of the indicators. How many unique observations are there? How many parameters need to be estimated by the model? How many degrees of freedom will this model have? Based on the 50:1 N:q rule, roughly how many subjects will be required to adequately measure this model?

@@ -1,0 +1,200 @@
+---
+title: "Problem Set 5"
+author: "Janette Avelar"
+date: "5/30/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(rio)
+library(here)
+library(tidyverse)
+library(lme4)
+library(janitor)
+
+group_dat <- import(here("data", "PS5_ATLAS-group.sav")) %>% 
+  clean_names()
+ind_dat <- import(here("data", "PS5_ATLAS-individual.sav")) %>% 
+  clean_names()
+```
+
+# Data Context  
+
+For these questions we’ll be using data from the The ATLAS program is a team-based intervention designed to decrease steroid use among high school football players. Thirty-one teams from different high schools in the northwest U.S. were randomly assigned to intervention or control conditions. The seven-week intervention consisted of both classroom and weight training sessions. Although the ultimate object of the ATLAS program was to reduce steroid use, a more immediate aim was to increase the adoption of healthy alternatives to steroids such as strength training. Therefore, levels of strength training self-efficacy were measured prior to and immediately following the intervention period.Adolescents Training and Learning to Avoid Steroids (ATLAS) project.  
+
+The dataset contains the following variables:  
+`school` - school ID  
+`grade` - student grade (9-12)  
+`stu_id` - individual student ID  
+`intervention` - indicates whether school was control (*0*) or intervention (*1*)  
+`stse0` - self-reported strength training self-efficacy (*pretest*)  
+`stse1` - self-reported strength training self-efficacy (*posttest*)  
+`use0` - individual steroid use either yes (*1*) or no (*0*) (*pretest*)  
+`coachtol0` - perception of coach tolerance of steroid use (*pretest*)  
+`reasons0` - number of reasons for using steroids (*pretest*)  
+`se0` - self-reported self esteem (*pretest*)  
+`se1` - self-reported self esteem (*posttest*)
+
+# Question 1  
+Use R to estimate a disaggregated model predicting post-test strength training self-efficacy from the pretest measure of this variable.
+
+```{r disaggregated model}
+dagg <- lm(stse1 ~ stse0, data = ind_dat)
+summary(dagg)
+```
+
+**What do the results of this analysis suggest?**  
+
+The results of our disaggregated model suggest that a pretest score for self-reported strength training self-efficacy of 0 results in a posttest score of 3.86 with an additional 0.35 point increase for each subsequent unit increase in self-reported self-efficacy at pretest.
+
+**What is the problem with conducting the analysis in this manner?**  
+Our degrees of freedom is 1199 which does not accurately reflect the degrees of freedom in the model we ran because it is ignoring the variance between our control and intervention groups, thus greatly inflating our chances of committing a Type I error.
+
+# Question 2  
+Estimate an aggregate model predicting mean posttest strength training self-efficacy from mean pretest strength training self-efficacy.  
+
+```{r aggregated model}
+#create mean scores
+agg_dat <- ind_dat %>% 
+  group_by(schoolid) %>% 
+  summarize(stse0_mean = mean(stse0, na.rm = TRUE),
+         stse1_mean = mean(stse1, na.rm = TRUE))
+#run model with mean scores
+agg <- lm(stse1_mean ~ stse0_mean, data = agg_dat)
+summary(agg)
+```
+
+
+**What do the results of this analysis suggest?**  
+The results of our aggregated model suggest that a pretest score for self-reported strength training self-efficacy of 0 results in a mean posttest score of 3.3 with an additional 0.45 point increase for each subsequent unit increase in mean self-reported self-efficacy at pretest.
+
+**Is this analysis consistent with the disaggregated analysis?**  
+The results of our aggregated and disaggregated models are similar, but not entirely consistent, with the biggest difference reflected in our degrees of freedom (1199 vs. 29).
+
+# Question 3  
+Conduct an OLS regression within each school predicting posttest strength training self-efficacy from pretest strength training. Plot the lines on a single set of axes.  
+
+```{r OLS regression}
+options(scipen=999)
+#factor school ID
+ind_dat <- ind_dat %>% 
+  mutate(schoolid = factor(schoolid)) 
+# run model looking at school intercepts
+ols_int <- lm(stse1 ~ stse0 + schoolid, data = ind_dat)
+summary(ols_int)
+# run model looking at school slopes
+ols_slopes <- lm(stse1 ~ stse0*schoolid, data = ind_dat)
+summary(ols_slopes)
+#extract intercepts and slopes
+ints_slopes <- ind_dat %>% 
+  split(.$schoolid) %>% 
+  map(~ lm(stse1 ~ stse0, data = .)) %>%
+  map_dfc("coefficients") %>% 
+  cbind(term = c("intercept", "b_strength"), .) %>% 
+  gather(schoolid, estimate, -term) %>% 
+  spread(term, estimate)
+#plot
+ggplot(data = ind_dat, aes(stse0, stse1, color = schoolid)) +
+  geom_point() +
+  geom_abline(slope = ints_slopes$b_strength, intercept = ints_slopes$intercept) + 
+  theme_minimal() +
+  labs(title = "Pre- and Post-test Scores on Strength Training Self-Efficacy",
+       subtitle = "School IDs indicated by colored lines",
+       x = "Pretest Scores",
+       y = "Posttest Scores")
+```
+
+**Does it look like the ANCOVA assumption (homogeneity of regression) would be met?**  
+No, from the plot there appears to be distinct clustering with a set of schools with more stagnant scores (and one which appears to go down), and varying degrees of slope severity.
+
+# Question 4  
+Finish the intercepts- and slopes-as-outcomes analysis: use the group-level intervention variable to (separately) predict intercepts and slopes.  
+
+```{r OLS part 2}
+#first left-join ints_slopes with original dataset to ensure intervention variable is in our dataset
+ols_dat <- ind_dat %>% 
+  select(schoolid, intervention) %>% 
+  mutate(intervention = factor(intervention, levels = c(0, 1), labels = c("control", "intervention"))) %>% 
+  left_join(ints_slopes, by = "schoolid")
+#use int_slopes to regress intercepts on predictor
+ints_model <- lm(intercept ~ intervention, data = ols_dat)
+summary(ints_model)
+#now use int_slopes to regress slopes on predictor
+slopes_model <- lm(b_strength ~ intervention, data = ols_dat)
+summary(slopes_model)
+```
+
+**Summarize the results of the analysis:**  
+Our model predicts a posttest score of 2.86 for self-reported strengths training self-efficacy for our control group with a pretest score of 0, which is predicted to increase by 0.49 points for each increase in pretest score. For our groups that received the intervention, a posttest score of 4.69 (2.86224*intercept* + 1.82466*slope*) is expected given the same pretest score with a decrease of -0.25 for every unit increase in pretest score.
+
+# Question 5  
+Compute the ICC of posttest strength training self-efficacy.
+
+```{r null model and ICC}
+#first we need to run our null model
+rcr_0 <- lmer(stse1 ~ 1 + (1 | schoolid),
+              data = ind_dat)
+summary(rcr_0)
+#now estimate ICC
+#between group variance / total variance
+0.1147/(0.1147+1.0636)
+```
+
+**In your estimation, is an ICC of this size likely to be problematic? Is most of the variance between or within groups?**  
+Our ICC is about 0.1, meaning only about 10% of the variance is due to differences between groups. Given that we ran an experimental design, this doesn't bode well for our findings as it indicates that the majority of our variance is within groups, occurring at the individual level rather than due to our intervention. 
+
+# Question 6  
+Write down the first- and second-level equations for a random coefficient model in which posttest strength training self-efficacy is predicted by pretest strength training self-efficacy, intervention, and their interaction.  
+
+Level 1:  
+$$L1: Y_{ij} = b_{0j} + e_{ij}$$
+where $b_{0j}$ = our intercept at 0 pretest score and $e_{ij}$ is our individual-level error term.  
+
+Level 2:  
+$$L2: 	b_{0j} = g_{00} + u_{0j}$$
+where $g_{00}$ = our intercept for control group and $u_{0j}$ is our group-level error term.  
+
+Full model:
+$$Y_{ij} = g_{00} + g_{01}pre_j + g_{10}control_{ij} + g_{11}pre_{ij}*control_j + (u_{0j} + u_{1j}pre_{ij} + e_{ij})$$
+
+**What is the meaning of each parameter?** 
+$g_{00}$ = expected Y-intercept with a pretest score of 0 for the control group  
+$g_{01}$ = expected difference in intercept given a change in pretest score  
+$g_{10}$ = expected slope given assignment to either control (0) or experimental (1) group  
+$g_{11}$ = effect of assignment on slope  
+$u_{0j}$ = random error from predicting our intercepts  
+$u_{1j}$ = random error from predicting our slopes  
+$e_{ij}$ = variance at the individual level  
+
+# Question 7  
+Examine the model from Problem 6. Suppose the slope of pretest strength training self-efficacy was found not to vary significantly across schools. **How would this change model? How would it change your interpretation of the data?**  
+
+If the slope of pretest strength training self-efficacy did not vary significantly across schools I would not continue analyzing using MLM, but would rather focus on within-group differences because it would not be important to find a predictor that explained the variance in slopes. I'd turn to individual-level predictors that might explain the variance within schools and would interpret the data in light of individual-level differences and predictors that may or may not hold across schools.  
+
+# Question 8  
+Run the model from Problem 6 in R using `lmer()`.  
+
+```{r full model}
+#factor intervention in ind_dat
+ind_dat <- ind_dat %>% 
+  mutate(intervention = factor(intervention, levels = c(0, 1), labels = c("control", "intervention")))
+#run model
+rcr_1 <-  lmer(stse1 ~ 1 + stse0*intervention + (1 + stse0 | schoolid),
+              data = ind_dat)
+summary(rcr_1)
+```
+
+**What are the parameters?**  
+
+**How do the results compare to the results from the intercepts- and slopes-as-outcomes model?**  
+
+I wasn't able to answer this question because my model wouldn't run. I get the following warning message regarding convergence failure:  
+`Warning message:`
+`In checkConv(attr(opt, "derivs"), opt$par, ctrl = control$checkConv,  :`
+  `Model failed to converge with max|grad| = 0.653934 (tol = 0.002, component 1)`
+  
+I tried to do some troubleshooting on my own, but as it was not required for the assignment and I'm short on time this week and unable to go to office hours I went ahead and turned in. But if you have any suggestions for why this wasn't working I'd love some feedback!

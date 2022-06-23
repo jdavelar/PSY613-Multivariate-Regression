@@ -1,0 +1,514 @@
+---
+title: "PSY 613 Lab 7: Logistic Regression"
+date: "May 14th, 2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Basic Review of Exponents and Natural Logs
+
+### Product Rule: 
+*When multiplying two powers with the same base, you ADD the exponents.*
+
+$$(x^a)(x^b) = x^{(a+b)}$$
+  
+  
+**For example, $$(x^2)(x^3) =  x^{(5)}$$ expanded would be $$(x * x) * (x * x * x)$$.**
+
+  
+### Power Rule: 
+*When raising a power to a power, you MULTIPLY the exponents.*
+
+$$(X^a)^b = X^{ab}$$
+
+**For example, $$(X^2)^3 = X^{6}$$ expanded would be $$(x * x) * (x * x) * (x * x)$$.**
+  
+  
+### Log Rule:
+*Remember: With log we are asking what power a value needs to be raised to equal the argument value.*
+  
+$$log_2(8) = 3$$
+
+**In this example, we are asking what power 2 needs to be raised to equal 8. Since 2 needs to be raised to the power of 3 to equal 8, the answer is 3.**  
+**[Note: With natural log (ln), the value that will be raised to a power is Euler's number (i.e., 2.71).]**  
+.  
+
+```{r solving in R}
+# we can solve log rule directly with R code
+#example
+log(8, base = 2)
+```
+
+
+### Natural Log Rules:
+*The value that e must be brought to the power of to equal e to a certain power is the same value.*
+
+$$ln(e^x) = x$$
+
+**A more mathematical approach would be $$ln(e^x) = x * ln(e) =  x * 1 = x$$.**  
+
+
+*Raising e to the power of the result of $ln(x)$ raises e to the power of what value e must be taken to to equal x.*
+  
+$$e^{ln(x)} = x$$
+**The result is always x.**
+   
+*Any number (excluding zero), brought to the power of 0 will equal one.*
+  
+$$ln(1) = 0$$
+
+**Therefore, $$e^0 = 1$$.**  
+**[Note: People disagree on whether or not an exponent with a base of 0 will be 0.]**  
+  
+
+[This website has more info on rules and definitions for natural logs!](https://www.rapidtables.com/math/algebra/Ln.html)
+
+---
+
+## Brief Conceptual Review of Logistic Regression
+
+### Three algebraically equivalent forms of the logistic regression equation:
+
+1. Odds: $odds(Y) = \frac{p}{1-p} = e^{b_0 + b_1X_i}$
+
+2. Logit **(a portmanteau of logical units**) (log odds): $logit(Y) = ln(\frac{p}{1-p}) = b_0 + b_1X_i$
+
+3. Probability: $p(Y) = \frac{e^{b_0 + b_1x_i}}{1 + e^{b_0 + b_1x_i}}$
+
+|      | Probability < .50 | Probability = .50 | Probability > .50   
+|------|------------------|-------------------|-------------------
+|Odds  | 0 < X < 1        |         1         | 1 < X < +Inf
+|Logit | -Inf < X < 0     |         0         | 0 < X < +Inf 
+
+  
+[Note: It may be helpful to think of log odds as sort of like z-scores, in that they're standardized and centered around 0.]  
+
+---
+
+## Running Logistic Regression in R
+
+### The `glm()` function
+Because pretty much everything we do is a line, we're going to use a function that's very similar to `lm()`.
+`glm()` stands for *generalized linear model*, and it is different from `lm()` in that it allows us to specify what type of distribution our DV is, which tells it a link function to use. 
+
+The link function is the function used to transform both sides of our equation, in order to make the variables linear again (since, again, the main thing we're good at is drawing straight lines). The correct link function to choose depends on what your DV is like, so you just need to tell R what family of distributions your data fall into, and it will assign the appropriate link function.
+
+For binary data, you want to set the family to binomial, so we'll set the argument `family = "binomial"`. By default, `glm()` will use a logit link function for binomial data. 
+
+### Model Comparison 
+
+As Elliot mentioned in lecture, the parameter tests (i.e., the test of the intercept and slopes) in `glm()` use a z score, which assumes a normal distribution (which is problematic). One way around this is to do model comparison, comparing nested models to see if our variables of interest improve the model's fit. This is a better approach because the statistic we use for model fit, the *deviance* or -2 Log Likelihood, **does** follow a known distribution: it's $\chi^2$ distributed, with *df* = the model's *df*. The difference in *deviance* values also follows a $\chi^2$, with *df* = the difference in *df* between the models you're comparing.
+
+So, a good workflow for logistic regression is something along the lines of:
+
+1. Fit baseline model.
+    * start with NULL model, but each model becomes the baseline for the next model.
+2. Add a predictor to the model and fit this new model.
+3. Compare the fit of the new model to the baseline model.
+4. Repeat for each predictor you have.
+
+## Research Example 1: Logistic Regression with a Single Predictor
+
+Let's start with an example with a single predictor variable.
+
+### Research Scenario
+
+These data are from a sample of women ($N = 336$) who were victims of sexual harassment. We will try to predict whether or not they reported the harassment (0 = did not report, 1 = did report) based on the offensiveness of the behavior.
+
+### Modeling
+
+#### Read, Wrangle, & Clean Data
+
+Next we'll read in the data, take a quick look at it, and do any cleaning we need to. Since this is an SPSS (.sav) file, one thing we can do to read in the labelled factors as labelled factors is use a function from the `rio` library called `factorize()`. This basically checks the `attributes` of columns and applies any labels that are stored there (which is where SPSS files store the factor labels). A word of caution about factorize - it's great when we know we want all of the labelled variables to be factors, which we do in this case. However, it is indiscriminate and if you're not careful you can accidentally turn something you want to be a number into a labelled factor; a common example of this in psychological data is turning Likert items from numeric variables (1, 2, 3, ...) to a labelled factor (strongly disagree, disagree, ...).
+
+```{r}
+options(scipen = 999)
+# You'll need to install 1 package.
+# install.packages("gmodels")
+library(rio)
+library(tidyverse)
+library(gmodels)
+library(here)
+log_df <- import(here("data", "613_Lab07_LogisticRegression.sav")) %>% 
+  rio::factorize()
+
+```
+
+Quick sanity check of the data to make sure everything looks right:
+
+```{r}
+str(log_df)
+```
+
+While we're at it, let's mean-center offensive behavior.
+
+```{r}
+log_df <- log_df %>% 
+  mutate(offen_behav_c = scale(offen_behav, scale = FALSE))
+```
+
+Yep everything looks good; worth pointing out that our outcome variable `reported` is in the order `"no"`, `"yes"`, which is the order we want them in (no will be 0, yes will be 1).
+
+#### Fit Baseline (NULL) Model
+
+Now we'll fit our baseline, intercept only model. We can use this in a model comparison to see, and also see what the base odds of reporting are
+```{r}
+log_model_0 <- glm(reported ~ 1,
+                   data = log_df, family = "binomial")
+
+summary(log_model_0)
+```
+
+>Q: What does the intercept estimate mean?    
+A: **It is the base odds in logits, or log odds. We can't really interpret in this form.**
+
+>Q: How do we recover the base odds of reporting from the model above?    
+A: **We take $e^{b_0}$ to get the odds from the logit or log odds, since $e^{ln(odds)} = odds$.**
+
+##### Get Interpretable Parameters
+
+Next we want to take the coefficients of the model, which we can get with `coef()` and turn them from log odds into odds. We can do that with `exp()`, which takes an input (in this case, our coefficient vector) and returns an object of the same size where each element is returned as e to that power (i.e., $b_0$ in the original vector is returned as $e^{b_0}$ when you use `exp(b_0)`). 
+
+```{r}
+coef(log_model_0) %>% 
+  exp()
+
+# Note: You can also use exp(log_model_0$coefficients) or exp(log_model_0[["coefficients"]]).
+```
+
+>Q: What are these odds in probability?    
+A: **$\frac{.96}{1 + .96} = .49$. In this model, it is the probability of reporting the harassment.**  
+*If you wanted to double check this, you could take your yes/no column, convert it to numeric, have it range from 0-1, and average the values (i.e., `mean(as.numeric(log_df$reported)-1)`). The result is .4910714.*
+  
+```{r}
+mean(as.numeric(log_df$reported) - 1)
+```
+
+##### Get Predicted Probabilities
+
+You can get the predicted probability for each participant by using the `predict()` function. If you set `type = "response"`, it will provide the predicted probabilities; if you change this to `type = "link"`, it will provide predicted logits instead.
+
+```{r}
+pred_probs_model0 <- predict(log_model_0, type = "response")
+range(pred_probs_model0)
+```
+
+You can see here that everyone has the same predicted probability of reporting based on the NULL model. 
+
+>Q: Why is that?    
+A: **It's the null model. Everyone has the same predicted probability (the intercept).**
+
+##### Construct a Classification Table
+
+To get a classification table, you'll need to convert the predicted probabilities (which will range continuously between 0 and 1) to your binary outcome, in this case, "reported": yes or no. To do this, decide on a cutoff, and all probabilities above that cutoff will be considered a "yes" and all below the cutoff will be "no". The most typical cutoff is .5, but you might want to pick another value depending on your situation (if you're more worried about a miss than a false alarm, you can set your cutoff lower to minimize that risk, and vice versa if you have the opposite concern).
+
+Then we'll use the `CrossTable()` from the `gmodels` library to get our classification table. CrossTables does exactly what it sounds like; it gives you a cross-tabulated table. A classification table *is* a cross-tabulated table for predicted and actual classification.
+
+```{r}
+b0_classification <- log_df %>% 
+  mutate(pred_reported = ifelse(pred_probs_model0 < .50, "no", "yes")) %>% 
+  select(reported, pred_reported) # we'll select just the actual and predicted variable here
+
+CrossTable(b0_classification$reported, b0_classification$pred_reported)
+```
+**Note: Since the predicted probability of all participants is .49, all will be coded as no.**
+
+>Q: How did we do?    
+A: **You can see that we got about half correct (171/336 = .51). All "yes" cases were misclassified because, as mentioned above, all cases were predicted to be "no."**
+
+#### Add a Predictor
+
+Next we'll add a predictor to our model and see if that improves our model's classification accuracy. We'll add in the behavior offensiveness score to see if people are more likely to report harassment as a function of how offensive the behavior is.
+
+```{r}
+log_model_1 <- glm(reported ~ 1 + offen_behav_c,
+                   data = log_df, family = "binomial")
+```
+
+##### Compare model to baseline
+
+Next, we'll compare the model with a predictor to the baseline (null) model to see if offensiveness of behavior increases our predictive accuracy. We'll use `anova()`, which will provide a deviance change test. Remember, that deviance change score is $\chi^2$ distributed with *df* equal to the number of predictors added; we can tell it to display the p value by setting the argument `test` to `"Chisq"`, like so:
+
+```{r}
+(comparison1 <- anova(log_model_0,
+      log_model_1, test = "Chisq"))
+```
+
+**Resid.df = the df for each model**
+
+**Resid.dev = the deviance for each model**
+
+**df = df for the change test (i.e., the number of additional parameters you are estimating from one model to the next.**
+
+**deviance = difference in deviances between models**
+
+>Q: Does Offensive Behavior Significantly Predict Odds of Reporting Sexual Harassment?    
+A: **Yes, $\chi^2$ = `r round(comparison1$Deviance[2],2)`, p < .001. In other words, the addition of offensive behavior as a predictor significantly improved model fit (our model is better at correctly classifying whether the harassment was reported or not).**   
+
+##### Get Interpretable Coefficients
+
+Let's take a look at our model
+
+```{r}
+summary(log_model_1)
+```
+
+>Q: What does the intercept mean?    
+A: **The log odds of reporting when behavior is the average level of offensive (0, because offensive was mean-centered)**
+
+>Q: What does the slope for offensive behavior mean?    
+A: **The slope is the expected change in the log odds of reporting sexual harassment for a one-unit change in offensiveness of behavior. In other words, for each one-unit increase in offensiveness of behavior, the log odds of reporting harassment increases by .46.**
+
+We should turn them into odds to actually interpret them. We again pipe `coef()` of our model to `exp()` to turn the logits into odds.
+
+```{r}
+(m1_odds <- coef(log_model_1) %>% 
+  exp())
+
+m1_odds_int <- round(m1_odds[[1]],2)
+m1_odds_slope <- round(m1_odds[[2]],2)
+```
+
+>Q: What does the intercept mean?    
+A: **The intercept of `r m1_odds_int` means that the odds of reporting are `r m1_odds_int` when behavior is at the average level of offensive**
+
+>Q: What does the slope for offensive behavior mean?    
+A: **The slope is the expected change in the odds of reporting sexual harassment for each one-unit change in offensiveness of behavior. In other words, for every one-unit increase in offensiveness of behavior, the odds that women will report sexual harassment are `r m1_odds_slope` (i.e., $e^{.46}$) greater.**
+
+>Q: What is the score on offensiveness of behavior at which the probability of reporting harassment is 50% (that is, the score that separates subjects who are and are not expected to report harassment) called?  
+A: **threshold**
+
+>Q: How is it calculated?    
+A: **$\frac{-b_0}{b_1}$**
+
+```{r}
+-log_model_1$coef[[1]] / log_model_1$coef[[2]]
+```
+
+>Q: What does .08 tell us?    
+A: **It is the value of offensive behavior above which the probability of reporting is > .50 and below which the probability of reporting is < .50**
+
+*Note: This will come in handy when we graph things below.*
+
+##### Get Predicted Probabilites
+
+We'll start by calculating one subject's predicted probability by hand:
+
+>Q: How would we find the predicted probability of reporting sexual harassment based on offensiveness of behavior FOR SUBJECT 2?    
+A: **We can get this by writing out the logistic regression formula, plugging in Subject 2's answers, and solving the equation.**
+
+Let's go ahead and try that.
+
+First, we can write out the equation:
+
+$$Prob = \frac{e^{b_0 + b_1X1}}{1 + e^{b_0 + b_{1}X1}}$$
+
+Then we need subject 2's score on offensive behavior
+
+```{r}
+(x_sub2 <- log_df[2, "offen_behav_c"])
+
+m1_int <- log_model_1$coefficients[[1]]
+m1_slope <- log_model_1$coefficients[[2]]
+```
+
+And now we just plug all of the values into that equation:
+
+$$Prob = \frac{e^{-.04 + .46*2.37}}{1 + e^{-.04 + .46*2.37}} = \frac{e^{1.05}}{1 + e^{1.05}}$$
+
+**Which equals:**
+
+```{r}
+exp(1.05) / (1 + exp(1.05))
+
+
+exp(m1_int + m1_slope*x_sub2) / (1 + exp(m1_int + m1_slope*x_sub2))
+```
+
+**And let's check our work:**
+
+```{r}
+pred_probs_model1 <- predict(log_model_1, type = "response")
+pred_probs_model1[2]
+```
+
+Yep - we have a small amount of rounding error when we do it fully by hand, but our calculations were correct. The predicted probability of Subject 2 reporting harassment is .74.
+
+##### Get Classification Table
+
+Next we'll get a classification table for this model too.
+
+```{r}
+model1_classification <- log_df %>% 
+  mutate(pred_reported = ifelse(pred_probs_model1 < .50, "no","yes")) %>% 
+  select(reported, pred_reported) # we'll select just the actual and predicted variable here
+
+
+model1_class_table <- CrossTable(model1_classification$reported, model1_classification$pred_reported,
+                                 prop.r = F, prop.c = F, prop.chisq = F) # these remove some table proportions we don't need
+```
+
+If we want to know the total proportion of participants correctly classified, we can simply sum the proportions on the diagonal of the above table (since the diagonal is correct classification). `model1_class_table` has several tables stored in it, but `prop.tbl` is just the proportions. So we want to take just that part of the object `model1_class_table$prop.tbl `, then take just the diagonal elements with `diag()`, then sum those with `sum()`.
+
+```{r}
+(m1_pred_acc <- model1_class_table$prop.tbl %>% 
+  diag() %>% 
+  sum() %>% 
+  round(4))
+```
+
+>Q: How accurate is our new model?    
+A: **We got the correct answer `r m1_pred_acc*100`% of the time. So adding offensive behaviour helped.**
+
+## Research Example 2: Logistic Regression with Multiple Predictors
+
+### Research Scenario
+
+Now we're going to add a second predictor, relationship status, to our model and see if that improves our classification accuracy. It is a factor coding relationship status (3 levels: single, in a relationship, married); it is already a factor since we used factorize above, so we can jump right into modeling. Note that we're treating the model with offensive behavior in it as our baseline model in this case.
+
+### Modeling 
+```{r}
+log_model_2 <- glm(reported ~ 1 + offen_behav_c + rel_stat,
+                   data = log_df, family = "binomial")
+```
+
+#### Model Comparison
+```{r}
+anova(log_model_1,
+      log_model_2,
+      test = "Chisq")
+```
+
+>Q: What is the *df* for this test? Why is it that value?    
+A: **2, because a 3-level factor adds 2 predictors to the model**
+>Q: Did adding relationship status significantly improve our model's accuracy?     
+A: **No, it looks like it did not (p > .05)**
+
+#### Interpreting Coefficients
+
+```{r}
+contrasts(log_df$rel_stat) # can also use levels(log_df$rel_stat), since r defaults to first level as reference
+
+coef(log_model_2) %>% 
+  exp()
+```
+
+>Q: What's the reference group for relationship status?    
+A: **Single**
+
+>Q: What does the intercept mean?    
+A: **The odds of reporting if you are single and have experienced the average level of offensive behavior is .76**
+
+>Q: What does the slope for offensive behavior mean?    
+A: **The odds of reporting harassment (for single people) increases by 1.61 times for each unit increase in a behavior's offensiveness.**
+
+>Q: What does the slope for 'in a relationship' ($b_2$) mean?    
+A: **The odds that people in a relationship will report harassment is 1.89 times greater than for single people.**
+
+>Q: What does the 'married' slope ($b_3$) mean?    
+A: **The odds that people who are married will report harassment is 1.19 times greater than for single people.**
+
+When we plot these lines below, we'll need to calculate different intercepts and thresholds for single, in a relationship, and married based on these values.
+
+First let's get predicted probabilities and a classification table
+
+```{r}
+pred_probs_model2 <- predict(log_model_2, type = "response")
+```
+
+And a classification table:
+```{r}
+model2_classification <- log_df %>% 
+  mutate(pred_reported = ifelse(pred_probs_model2 < .50, "no", "yes")) %>% 
+  select(reported, pred_reported) # we'll select just the actual and predicted variable here
+
+
+model2_class_table <- CrossTable(model2_classification$reported, model2_classification$pred_reported,
+                                 prop.r = F, prop.c = F, prop.chisq = F) # these remove some table proportions we don't need
+```
+
+And we can again get classification accuracy by summing the proportions on the diagonal.
+
+```{r}
+(model2_class_table$prop.tbl %>% 
+  diag() %>% 
+  sum() %>% 
+  round(4))
+```
+
+>Q: What is our classification accuracy and what does that mean?  
+A: **62.50% of the time we correctly classified whether harassment would be reported or not.**
+
+## Plotting
+
+Next, we'll go over plotting which can be a little tricky for logistic regression. Luckily ggplot and specifically `geom_smooth()` make it a lot easier.
+
+We're going to plot thresholds, so first we should calculate those for each group:
+
+First get the coefficients.
+```{r}
+intercept <- coef(log_model_2)[[1]]
+offense   <- coef(log_model_2)[[2]]
+in_rel    <- coef(log_model_2)[[3]]
+married   <- coef(log_model_2)[[4]]
+```
+
+Then we'll calculate thresholds for each group by dividing their -1 times their intercept (which is the intercept plus the group effect) by the coefficient for offensives behavior.
+```{r}
+thresh_single <- -intercept/offense
+thresh_inrel <- -(intercept + in_rel)/offense
+thresh_married <- -(intercept + married)/offense
+```
+
+Then, we need to create a numeric binary (0, 1) version of our reported variable; ggplot needs this to create the logistic regression lines with `geom_smooth()`.
+```{r}
+log_df <- log_df %>% 
+  mutate(reported_bin = ifelse(reported == "yes", 1, 0))
+```
+
+Now we set up a ggplot with (mean-centered) offensive behavior on the X axis, the binary, numeric version of report on the y axis, and color based on relationship status. Then we use `stat_smooth()` and tell it that the method is `"glm"` and pass `list(family = "binomial"))` to the `method.args` argument. Then we can add threshold lines with `geom_vline()`, which stands for vertical line; it just needs an x intercept (which we set to the threshold values), and we can set linetype to 2 to make it dashed. We'll color them to match the colors of our logistic regression lines, and increase the size of them just slightly (default is 1; I'm changing them to 1.2).
+```{r}
+ggplot(log_df, aes(x = offen_behav_c, y = reported_bin, color = rel_stat)) +  
+  scale_color_manual(values = c("palevioletred2","blueviolet","cornflowerblue")) +
+  # method = glm combined with the family = binomial tells it to run logistic regression
+  stat_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, fullrange = TRUE) + 
+  # add thresholds
+  geom_vline(xintercept = thresh_single, linetype = 2, color = "palevioletred2", size = 1.2) + 
+  geom_vline(xintercept = thresh_inrel, linetype = 2, color = "blueviolet", size = 1.2) + 
+  geom_vline(xintercept = thresh_married, linetype = 2, color = "cornflowerblue", size = 1.2) +
+  theme_minimal() +
+#  theme(axis.line = element_line(colour = "black")) +  
+  labs(x = "Offensive Behavior (Mean Centered)", 
+       y = "Probability of Reporting",
+       color = "Relationship Status")
+```
+
+You might be wondering what's going on in the 'in a relationship' group - it doesn't quite look like a logistic regression line. ggplot defaults to plotting within the range of the x variable, and the in a relationship line is so flat that we would need to extend the range of the x-axis to see its shape better. We'll do that next using `ggplot's` `xlim()` function; all you need is pass two numbers (min and max of the range), which we'll set to -40 and + 40:
+
+```{r}
+ggplot(log_df, aes(x = offen_behav_c, y = reported_bin, color = rel_stat)) +  
+  scale_color_manual(values = c("palevioletred2","blueviolet","cornflowerblue")) +
+  # method = glm combined with the family = binomial tells it to run logistic regression
+  stat_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, fullrange = TRUE) + 
+  # add thresholds
+  geom_vline(xintercept = thresh_single, linetype = 2, color = "palevioletred2", size = 1.2) + 
+  geom_vline(xintercept = thresh_inrel, linetype = 2, color = "blueviolet", size = 1.2) + 
+  geom_vline(xintercept = thresh_married, linetype = 2, color = "cornflowerblue", size = 1.2) +
+  theme_minimal() +
+#  theme(axis.line = element_line(colour = "black")) +  
+  labs(x = "Offensive Behavior (Mean Centered)", 
+       y = "Probability of Reporting",
+       color = "Relationship Status") +
+  xlim(-40, 40)
+
+```
+
+Now you can see that it does follow a sigmoidal shape like the others, but looks pretty linear in the range we were looking at (if you imagine expanding the part from -5 to 5).
+
+**The one drawback here is that the threshold lines (i.e., the vertical, dashed lines) are hard to distinguish. Nevertheless, you get the full view of the shapes for the four conditions.**
+
+

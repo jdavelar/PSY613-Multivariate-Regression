@@ -1,0 +1,85 @@
+---
+title: 'Lecture 12: Logits'
+author: "ETB"
+date: "5/5/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(foreign)
+library(ggplot2)
+library(gplots)
+setwd('~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data/')
+```
+
+## Bring in the data
+
+```{r import data}
+
+# Get the data using read.foreign
+data <- read.spss("Lecture12Labor.sav", to.data.frame=TRUE)
+head(data)
+
+```
+
+## Take a peak
+```{r look at data}
+table(data)
+
+balloonplot(t(table(data)), main ="housetasks", xlab ="", ylab="", label = TRUE, show.margins = FALSE)
+
+```
+
+## Alternative thing to do: Chi-square
+```{r chi-sq}
+
+chisq <- chisq.test(table(data))
+chisq
+
+```
+
+So there is definitely some interdependence between the rows and columns. The frequency of responses ("biased" versus "unbiased") depends on the condition in some way. But in what way? How strongly? That's what logistic regression is great for.
+
+## Run the logistic regression
+```{r logit it up}
+
+logitModel = glm(Outcome ~ Condition,
+                 data = data,
+                 family = binomial(link="logit"),
+                 na.action=na.omit)
+
+summary(logitModel)
+anova(logitModel)
+
+```
+
+## Plot
+```{r plot some stuff}
+
+# Create a hypothetical range of "condition" from 0 to 1
+hypCond <-seq(0, 1, 0.001)
+
+# Predict the fitted values given the hypothetical data and the model parameters
+predicted <- 1 + logitModel$coefficients[1] + 
+                 logitModel$coefficients[2]*hypCond
+
+predicted.data <- data.frame(hypCond,predicted)
+
+# Plot everything
+p <- ggplot(data, aes(x=as.numeric(Condition)-1, y=Outcome)) +
+  geom_point() + 
+  geom_jitter(width=.2, height = .2) +
+  xlab('Condition')
+
+
+p + 
+  geom_point() + 
+  geom_line(data=predicted.data, aes(x = hypCond, y = predicted+1))
+
+```

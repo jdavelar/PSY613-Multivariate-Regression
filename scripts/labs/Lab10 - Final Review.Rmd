@@ -1,0 +1,335 @@
+---
+title: "Lab 10 - Review"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+---
+
+```{r, message = FALSE}
+# load required packages
+library(rio)
+library(tidyverse)
+library(psych)
+library(lme4)
+library(lmerTest)
+library(qgraph)
+```
+
+# Data manipulation
+
+## Logistic Regression & MLM Data
+
+```{r}
+# setup data
+data_1 <- mpg %>%
+  filter(year == 2008) %>% # keep only year 2008
+  mutate(cty_c   =   cty - mean(.$cty), # center variables
+         displ_c = displ - mean(.$displ))
+
+# get group level data for the manufacturer (what percentage of a manufacturer's cars are manual?)
+data_1 <- data_1 %>% 
+  mutate(trans  = gsub("\\(.{2}\\)", "", trans),
+         manual = if_else(trans == "manual", 1, 0)) %>%
+  group_by(manufacturer) %>%
+  summarise(manual = mean(manual)) %>%
+  mutate(manual = manual * 100) %>%
+  left_join(data_1, by = "manufacturer")
+
+# look at the data
+data_1
+
+# create a new column which tells us whether a car is an suv or not
+data_1 <- data_1 %>%
+  mutate(suv = if_else(class == "suv", "yes", "no"),
+         suv = factor(suv))
+```
+
+## Network Analysis Data
+
+```{r}
+# download the data straight from the source
+data_2 <- import("https://osf.io/s87kd/download", "csv")
+
+# keep only big five items
+data_2 <- data_2 %>% 
+  select(-gender:-age)
+
+# we're going to create a grouping variable (i.e., the BFI factor); save the indices for each variable in a list
+ocean_indices <- list()
+
+ocean <- c("O","C","E","A","N")
+
+for (factor in ocean) {
+  ocean_indices[[factor]] <- grep(pattern = factor, colnames(data_2))
+}
+
+```
+
+# Logistic Regression
+
+**Research Question 1: Does fuel efficiency predict whether a car is an SUV or not?**
+
+*What method might help address this question?*
+
+## Run the model
+
+```{r}
+suv_model <- glm(suv ~ cty_c, data = data_1, family = "binomial")
+
+summary(suv_model)
+```
+
+*What do the coefficients mean?*
+
+## Calculate the odds
+
+```{r}
+# odds
+coef(suv_model) %>% 
+  exp()
+```
+
+*What do the exponentiated coefficients mean?*
+
+## Calculate the threshold
+
+```{r}
+#threshold (-b0/b1)
+thresh <- -suv_model$coef[[1]] / suv_model$coef[[2]]
+
+thresh
+```
+
+*What does the threshold mean?*
+
+## Calculate the predicted probability that each car is an SUV
+
+$$P = \frac{e^{b_0 + b_1X}}{1 + e^{b_0 + b_1X}}$$
+
+```{r}
+# the long way
+exp(suv_model$coef[[1]] + suv_model$coef[[2]]*data_1$cty_c) / (1 + exp(suv_model$coef[[1]] + suv_model$coef[[2]]*data_1$cty_c))
+
+# the short way
+data_1$pred_probs <- predict(suv_model, type = "response")
+```
+
+## Plot the curve
+
+```{r}
+# plot the curve
+ggplot(data_1, aes(x = cty_c, y = pred_probs)) +
+  geom_point() +
+  geom_vline(xintercept = thresh)
+
+# better plot
+ggplot(data_1, aes(x = cty_c, y = pred_probs)) +  
+  # method = glm combined with the family = binomial tells it to run logistic regression
+  stat_smooth(method      = "glm", 
+              method.args = list(family = "binomial"), 
+              fullrange   = TRUE, 
+              se          = FALSE, 
+              color       = "dodgerblue4") + 
+  geom_vline(xintercept = thresh, 
+             linetype   = 2, 
+             color      = "deeppink", 
+             size       = 1, 
+             alpha      = .8) +
+  ylim(c(0, 1)) +
+  xlim(c(-20, 15)) +
+  theme_bw() +
+  labs(x     = "City MPG (Mean Centered)", 
+       y     = "SUV Probability")
+```
+
+## Assessing Significance
+
+*What model should I compare this with to determine whether cty_c is a significant predictor?*
+
+```{r}
+null_model <- glm(suv ~ 1, data = data_1, family = "binomial")
+
+anova(null_model, suv_model, test = 'Chisq')
+```
+
+# Linear regression
+
+**Research Question 2: Does engine displacement (displ) predict fuel efficiency (cty)?**
+
+*What method might help address this question?*
+
+## Run the model
+
+```{r}
+reg_model <- lm(cty ~ displ_c, data = data_1)
+summary(reg_model)
+```
+
+## Plot the model
+
+```{r}
+ggplot(data_1, aes(x = displ_c, y = cty)) +
+  geom_point() +
+  stat_smooth(method = "lm") +
+  theme_bw()
+```
+
+*The data aren't independent though. Many of these datapoints come from the same manufacturer. What method takes this into account?*
+
+# Multilevel Model
+
+## Calculate ICC
+
+```{r}
+# fit the unconditional model
+model_0 <- lmer(cty ~ 1 + (1 | manufacturer), data = data_1, REML = FALSE)
+
+# the long way
+9.940 / (9.940 + 7.403)
+
+# the short way
+performance::icc(model_0)
+```
+
+## Add displ_c as a predictor
+
+```{r}
+# displ as a level-one fixed effect
+model_1 <- lmer(cty ~ displ_c + (1 | manufacturer), data = data_1, REML = FALSE)
+
+summary(model_1)
+```
+
+*What are the fixed effects and what are the random effects?*
+
+*What are your level 1 and level 2 predictors?*
+
+*How do you include random slopes in the model?*
+
+```{r}
+# displ as a random effect
+model_2 <- lmer(cty ~ displ_c + (1 + displ_c | manufacturer), data = data_1, REML = FALSE)
+
+summary(model_2)
+```
+
+## Check whether adding random slopes significantly improves the model
+
+```{r}
+anova(model_1, model_2)
+```
+
+## Plot the model
+
+```{r}
+ggplot(data_1, aes(x = displ_c, y = cty, color = manufacturer)) +
+  geom_point() +
+  stat_smooth(method = "lm", se = FALSE) +
+  theme_bw()
+```
+
+## Adding a Level 2 Predictor
+
+```{r}
+model_3 <- lmer(cty ~ displ_c + manual + (1 + displ_c | manufacturer), data = data_1, REML = FALSE)
+
+summary(model_3)
+```
+
+## Check whether the level 2 predictors significantly improves the model
+
+```{r}
+anova(model_3, model_2)
+```
+
+## The equations
+
+*What is the level 1 equation?*
+
+$$CTY_{ij} = b_{0j} + b_{1j}DISPL_{ij} + e_{ij}$$
+
+*What is the level 2 equation?*
+
+$$CTY_{0j} = g_{00} + g_{01}MANUAL_j + u_{0j}$$ $$b_{1j} = g_{10} + u_{1j}$$
+
+*What is the combined equation?*
+
+$$CTY_{ij} =  g_{00} + g_{01}MANUAL_j + g_{10}DISPL_{ij}  + (e_{ij} + u_{0j} + u_{1j}DISPL_{ij})$$ $$CTY_{ij} =  15.59 + .037MANUAL_j - 2.30DISPL_{ij}  + (e_{ij} + u_{0j} + u_{1j}DISPL_{ij})$$
+
+# Network Analysis
+
+## Creating a zero-order correlation matrix
+
+```{r}
+data_2_cor <- cor(data_2, use = "pairwise.complete.obs")
+```
+
+## Creating a correlation network graph
+
+```{r}
+data_2_cor_net <- qgraph::qgraph(input      = data_2_cor,
+                                 graph      = "cor",
+                                 threshold  = "sig",
+                                 sampleSize = nrow(data_2),
+                                 groups     = ocean_indices,
+                                 layout     = "circular")
+```
+
+## Calculating centrality measures
+
+Recall:
+
+-   *Betweenness* refers to how many direct connections between other nodes a node is involved in
+-   *Closeness* refers to the average distance between a node and all other nodes
+
+```{r}
+data_2_centrality <- data_2_cor_net %>% 
+  qgraph::centrality_auto() %>% 
+  .$node.centrality
+```
+
+## Creating a correlation network graph with the size of the nodes weighted by betweenness
+
+```{r}
+data_2_cor_net_b <- qgraph::qgraph(input      = data_2_cor,
+                                   graph      = "cor",
+                                   threshold  = "sig",
+                                   sampleSize = nrow(data_2),
+                                   groups     = ocean_indices,
+                                   layout     = "circular",
+                                   vsize      = data_2_centrality$Betweenness)
+```
+
+## Creating a correlation network graph with the size of the nodes weighted by closeness
+
+```{r}
+data_2_cor_net_c <- qgraph::qgraph(input      = data_2_cor,
+                                   graph      = "cor",
+                                   threshold  = "sig",
+                                   sampleSize = nrow(data_2),
+                                   groups     = ocean_indices,
+                                   layout     = "circular",
+                                   vsize      = data_2_centrality$Closeness * 1000)
+```
+
+## Calculating the small-world index
+
+A small-world network is a network in which (a) most nodes are not neighbors of one another, (b) the neighbors of any given node are likely to be neighbors of each other, and (c) most nodes are connected by a short path to all other nodes.
+
+The small-word index (σ) is computed as the ratio of the clustering coefficient (normalized by that expected in a random graph) to the average shortest path length (also normalized by that expected in a random graph) (Humphries and others 2006).
+
+If the small-word index (σ) is greater than one, the network is small-world.
+
+```{r}
+data_2_swi <- smallworldIndex(data_2_cor_net)
+
+data_2_swi
+
+data_2_swi$index
+
+(data_2_swi$transitivity / data_2_swi$transitivity_random) / (data_2_swi$APL / data_2_swi$APL_random)
+```
+
+*Is the network among the Big Five items small-world?*

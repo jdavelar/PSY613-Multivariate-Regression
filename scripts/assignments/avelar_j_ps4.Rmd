@@ -1,0 +1,257 @@
+---
+title: "Problem Set 4"
+author: "Janette Avelar"
+date: "5/23/2022"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rio)
+library(tidyverse)
+library(gmodels)
+library(here)
+library(psych)
+library(caret)
+library(glmnet)
+library(rsample)
+
+dat <- import(here("data", "PS4-Dating.csv")) %>% 
+  janitor::clean_names()
+train_dat <- import(here("data", "PS4-trainMushroom.csv")) %>% 
+  janitor::clean_names()
+test_dat <- import(here("data", "PS4-testMushroom.csv")) %>% 
+  janitor::clean_names()
+
+options(scipen = 999)
+```
+
+# Part 1: Logistic Regression
+
+## Data Info
+
+Variables in `dat`:
+`childs` Self-reported childish behavior when facing conflict (past month frequency)
+`physs` Self-reported physical aggression against partner (past month frequency)
+`any_phys` Dichotomized physical aggression (0=No, 1=Yes)
+`selfdet` Self-determined (intrinsic) motives to stay in the relationship
+`alcfreq` Frequency of binge drinking each month (5 categories: 1=0 times, 2=2-3 times, 3=3-4 times, 4=6-7 times, 5=8+ times)
+`bp` The Buss-Perry aggression scale (higher scores mean more aggression)
+
+## Q1: Run a logistic regression predicting whether there is any physical aggression in a relationship or not (`any_phys`) based on the Buss-Perry Aggression scale. Interpret your findings in terms of odds. [HINT: Remember to first convert the DV, `any_phys`, into a categorical variable using the `factor()` function.]
+
+```{r q1}
+#factor DV and center predictor
+dat <- dat %>% 
+  filter(!is.na(bp)) %>% #4 NAs in BP
+  mutate(any_phys = factor(any_phys, levels = c(0, 1), labels = c("no", "yes"))) %>% 
+  mutate(bp_c = scale(bp, scale = FALSE))
+
+#fit predictive model
+bp_log_mod <- glm(any_phys ~ 1 + bp_c,
+                  data = dat, family = "binomial")
+summary(bp_log_mod)
+
+#extract coefs
+bp_odds <- coef(bp_log_mod) %>% 
+  exp()
+bp_odds_int <- round(bp_odds[[1]],2)
+bp_odds_slope <- round(bp_odds[[2]],2)
+#threshold
+-bp_log_mod$coef[[1]] / bp_log_mod$coef[[2]]
+
+#pred probs
+pred_probs_bp <- predict(bp_log_mod, type = "response")
+
+#classification table
+bp_classification <- dat %>% 
+  mutate(pred_reported = ifelse(pred_probs_bp < .50, "no", "yes")) %>% 
+  select(any_phys, pred_reported)
+bp_class_table <- CrossTable(bp_classification$any_phys, bp_classification$pred_reported,
+                                 prop.r = F, prop.c = F, prop.chisq = F)
+```
+
+We ran a logistic regression model to predict the presence of physical aggression in a relationship based on results from the Buss-Perry (BP) Aggression scale. At an average BP aggression score, the odds of physical aggression were .44 and BP aggression was a significant predictor of physical aggression, increasing the likelihood of the presence of physical aggression by 4 times for each standard deviation increase above an average BP aggression score. According to our model, centered scores above .58 on the BP scale indicate increased likelihood of physical aggression. These results should be taken with some caution, as our model correctly predicted the absence of physical aggression with 91% accuracy and the presence of physical aggression with only 30% accuracy.  
+
+
+
+## Q2: Re-run the logistic regression from #1 but this time as a hierarchical regression. Enter the Buss-Perry scale in the first step, and then include frequency of binge drinking in the second step. (Hint: remember that binge drinking is also a categorical variable.) Based on the output, report the point at which the probability of any physical aggression reaches 50% (i.e., the threshold) for any of the binge drinking groups (your choice which one!).
+
+
+```{r q2}
+#factor binge drinking
+dat <- dat %>% 
+  mutate(alcfreq = factor(alcfreq, levels = c(1:5), labels = c("0x/month", "2-3x/month", "3-4x/month", "6-7x/month", "8x+/month")))
+
+#fit new model
+alc_log_mod <- glm(any_phys ~ 1 + bp_c + alcfreq,
+                   data = dat, family = "binomial")
+#compare models
+anova(bp_log_mod,
+      alc_log_mod,
+      test = "Chisq") #adding pred is significant p = 0.01582
+
+#extract coefs
+contrasts(dat$alcfreq)
+coef(alc_log_mod) %>% 
+  exp()
+intercept    <- coef(alc_log_mod)[[1]]
+aggression   <- coef(alc_log_mod)[[2]]
+group_1      <- coef(alc_log_mod)[[3]]
+group_2      <- coef(alc_log_mod)[[4]]
+group_3      <- coef(alc_log_mod)[[5]]
+group_4      <- coef(alc_log_mod)[[6]]
+
+#predicted probs
+pred_probs_alc <- predict(alc_log_mod, type = "response")
+#classification table
+alc_classification <- dat %>% 
+  mutate(pred_reported = ifelse(pred_probs_alc < .50, "no", "yes")) %>% 
+  filter(alcfreq == "3-4x/month") %>% 
+  select(any_phys, pred_reported)
+alc_class_table <- CrossTable(alc_classification$any_phys, alc_classification$pred_reported,
+                                 prop.r = F, prop.c = F, prop.chisq = F)
+
+#threshold for group 2 (drinking 3-4x month)
+-(intercept + group_2)/aggression
+```
+
+
+We next ran a hierarchical regression, using a second model that added alcohol use as an additional predictor for physical aggression. The addition of alcohol use as a predictor was significant, predicting the odds of physical aggression for those who never drank were .41. This likelihood increased by 3.75 times for each standard deviation unit increase in BP scores. Regardless of BP score, the odds for individuals who drank 2 to 3 times a month were .8 times greater than those who never drank. The odds for individuals who drank 3 to 4 times a month were 1.1 times greater than those who never drank. The odds for individuals who drank 6 to 7 times a month were nearly 2 times greater than those who never drank and, finally, those who drank more than 8 times a month saw an increased likelihood of 14,549,472--though this is vastly inflated (*and I have no idea why*). The BP score at which probability of any physical aggression reached 50% for individuals who drink 3 to 4 times a month was .58, with our model accurately predicting the absence of physical aggression 89% of the time and the presence 67% of the time for this group.    
+
+
+## BONUS: Write down the equations to predict the probability of any physical aggression for each of the five binge drinking groups. Plot the probability curve for each using R.
+
+Group 1: Non drinkers
+$$AnyPhys = .4135594 + 3.7719944*BP$$
+
+Group 2: Drink 2-3 times/month
+$$AnyPhys = .4135594 + 3.7719944*BP + 0.7934039$$
+$$AnyPhys = 1.206963 + 3.7719944*BP$$
+
+Group 3: Drink 3-4 times/month
+$$AnyPhys = .4135594 + 3.7719944*BP + 1.1178301$$
+$$AnyPhys = 1.531389 + 3.7719944*BP$$
+
+Group 4: Drink 6-7 times/month
+$$AnyPhys = .4135594 + 3.7719944*BP + 1.9574893$$
+$$AnyPhys = 2.371049 + 3.7719944*BP$$
+
+Group 5: Drink 8+ times/month
+$$AnyPhys = .4135594 + 3.7719944*BP + 14549472.8907617$$
+$$AnyPhys = 14549473 + 3.7719944*BP$$
+
+```{r q3 plot}
+#assign thresholds
+thresh_g1 <- -intercept/aggression
+thresh_g2 <- -(intercept + group_1)/aggression
+thresh_g3 <- -(intercept + group_2)/aggression
+thresh_g4 <- -(intercept + group_3)/aggression
+thresh_g5 <- -(intercept + group_4)/aggression
+#create numeric binary
+agg_df <- dat %>% 
+  mutate(reported_bin = ifelse(any_phys == "yes", 1, 0))
+#plot
+ggplot(agg_df, aes(x = bp_c, y = reported_bin, color = alcfreq)) +  
+  scale_color_manual(values = c("#C4961A", "#D16103", "#52854C", "#4E84C4", "#293352")) +
+  stat_smooth(method = "glm", method.args = list(family = "binomial"), se = FALSE, fullrange = TRUE) + 
+  geom_vline(xintercept = thresh_g1, linetype = 2, color = "#C4961A", size = 1.2) + 
+  geom_vline(xintercept = thresh_g2, linetype = 2, color = "#D16103", size = 1.2) + 
+  geom_vline(xintercept = thresh_g3, linetype = 2, color = "#4E84C4", size = 1.2) +
+  geom_vline(xintercept = thresh_g4, linetype = 2, color = "#52854C", size = 1.2) +
+  geom_vline(xintercept = thresh_g5, linetype = 2, color = "#293352", size = 1.2) +
+  theme_minimal() +
+#  theme(axis.line = element_line(colour = "black")) +  
+  labs(x = "Physical Aggression (Mean Centered)", 
+       y = "Probability of Presence",
+       color = "Monthly Alcohol Use")
+```
+
+
+# Part 2: Machine Learning
+
+## Context & Data Info
+
+Suppose you are interested in foraging wild mushrooms. Unfortunately, you don’t know anything about which mushrooms are poisonous or edible. You begin recording information about the mushrooms you collect, and your friend agrees to taste them to determine whether they make him sick or not. Based on this information, train a model to be able to determine whether mushrooms no one has tasted yet are poisonous or edible.  
+
+The outcome variable is `class`, with `e` for edible and `p` for poisonous. The training set is `train_dat` and the test set is `test_dat`.
+
+## Q4: Run a logistic regression model on the training data to predict whether each mushroom is edible or poisonous. Use the parameters from this model to predict whether the mushrooms in the test set are poisonous or edible. How accurate is this model?  
+
+The best model we trained had a 92.7% accuracy on our training set, and 92.5% accuracy on our testing set.  
+
+```{r q4}
+# Model tuning
+# glm_info <- getModelInfo("glm")
+# glm_info$glm$parameters
+#factor
+train_dat <- train_dat %>% 
+  mutate(class = factor(class, levels = c("e", "p"), labels = c("edible", "poisonous")))
+test_dat <- test_dat %>% 
+  mutate(class = factor(class, levels = c("e", "p"), labels = c("edible", "poisonous")))
+# train model
+glm_mush <- train(class ~ ., 
+                      data = train_dat, 
+                      method = "glm", 
+                      family = "binomial",
+                      trControl = trainControl(method = "cv", number = 10))
+
+#look at results
+glm_mush$bestTune
+glm_mush$results
+
+#measure predictive accuracy
+train_preds <- predict(glm_mush, train_dat) # Predict values in the testing set
+test_preds <- predict(glm_mush, test_dat)
+
+#determine accuracy
+mean(test_preds==test_dat$class) #92.5% accurate
+```
+
+
+
+## Q5: Repeat the previous problem with a linear SVM classifier. First, set a random seed. Next, use k-fold cross-validation to determine which tuning parameters to use and plot the results. What value will you use? Finally, apply this model to the test data. How accurate is this model? If you find a poisonous mushroom that you haven’t seen yet, if you apply this model, how likely are you to incorrectly think it is edible?  
+
+Our best value for `C` was 1.577778, which is the value we'll use for the model. After applying the model to the test data, our model was 93.3% accurate, with a negative predictive value of 91%. So, we are 91% likely to incorrectly think the mushroom is edible when it's actually poisonous.  
+
+```{r q5}
+set.seed(12345)
+#model tuning
+svmLinear_info <- getModelInfo("svmLinear")
+svmLinear_info$svmLinear$parameters # the hyperparameter is C
+t_grid <- expand.grid(C = seq(from = .1, to = 2, length = 10))
+
+#build and train model
+svm_model <- train(class ~ ., 
+                      data = train_dat, 
+                      method = "svmLinear", 
+                      trControl = trainControl(method = "cv", number = 10), 
+                      tuneGrid = t_grid)
+
+# Look at the results from model training
+## See the final hyperparameter value from the tuning process
+svm_model$bestTune
+svm_model$results
+
+# Getting the model coefficients
+coefs <- svm_model$finalModel@coef[[1]] 
+mat <- svm_model$finalModel@xmatrix[[1]]
+
+coefs %*% mat
+
+#measure accuracy
+test_preds2 <- predict(svm_model, test_dat) # Predict values in the testing set
+# compare predictions vs actual
+data.frame(actual    = test_dat$class,
+           predicted = test_preds2)
+# compute model accuracy 
+accuracy_test_svm <- mean(test_preds2 == test_dat$class) #93.3% accurate
+accuracy_test_svm 
+
+# confusion matrix
+confusionMatrix(test_preds2, test_dat$class) 
+```

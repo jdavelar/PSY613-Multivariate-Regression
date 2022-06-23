@@ -1,0 +1,403 @@
+---
+title: "Machine Learning"
+author: 
+date:
+output:
+  html_document:
+    highlight: tango
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  word_document:
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+Libraries for today's lab:
+```{r, message = FALSE, warning = FALSE}
+# Un-comment the following line if you need to install these packages
+# install.packages(c("caret", "glmnet", "rsample"))
+library(tidyverse)
+library(ggplot2)
+library(psych)
+library(caret) # package for applying a broad range of machine learning algorithms
+library(glmnet) # performs ridge/lasso/elastic net regression
+library(rsample) # for splitting the data into a training set and a testing set
+```
+
+# Introduction to Machine Learning
+
+Machine learning is the process of building **predictive** models. A "training dataset" is used to build a model and optimize the model's parameters, and then the predictive ability of the model is tested using a "testing dataset."
+
+## Machine Learning Models: Regression and Classification
+- Regression: When predicting a continuous outcome 
+- Classification: When predicting a categorical outcome
+
+
+# Steps of Machine Learning
+- Data Splitting
+- Build Model Using Training Set
+  + pre-processing
+  + cross-validation 
+  + tuning
+- Examine Model Accuracy using Testing Set
+
+
+## Data Splitting
+
+Data splitting is the process of taking one set of data and splitting it up into a "training set" that is used to build your model and a "testing set" that is used to test the predictive accuracy of your model. 
+
+You typically want more data in the training set since this data is being used to build your model than in the testing set. Some proportions that are used typically are 70% training / 30% testing or 80% training / 20% testing, but you can adjust these.
+
+
+## Pre-Processing
+
+Pre-processing means performing any adjustments to the predictor variables that you want performed before building your model, like centering and scaling the predictors.
+
+
+## Cross-Validation
+
+Cross-validation is a statistical technique for splitting the training set multiple times into training/testing sets. Each of these training/testing sets is evaluated for error, and the error across all of the sets is averaged. This provides a more accurate assessment of the model's accuracy. 
+
+There are various cross-validation techniques available in R, but the one we will cover is k-fold cross-validation:
+
+- __k-fold cross-validation__: randomly splits the dataset into k chunks (aka, folds) of roughly equal size, and these chunks are split into training/testing sets. The error across all chunks is averaged. k can be any number between 2 and the number of observations in the full dataset, but it is most commonly a value between 3 and 10.
+
+
+## Tuning
+
+Hyperparameters are values that specify the settings of a ML algorithm that can be "tuned" by the researcher prior to training a model. Different algorithms have different hyperparameters. You don't know the best values of hyperparameters prior to training a model - have to rely on rules of thumb and/or try to find the best values through trial and error. This is the tuning process. 
+
+
+
+# Common Machine Learning Algorithms
+
+- Linear regression, lm()
+
+- Logistic regression, glm()
+
+- Support vector machines, svm() or svmLinear()
+
+- Random forests, randomForest()
+
+- Elastic nets, glmnet()
+
+And there are hundreds more... for a full list: names(getModelInfo())
+
+
+# Overfitting
+
+A very __important__ consideration in the building of predictive models is overfitting. The data in the training set is going to reflect true, underlying relationships among variables, but there will also be an amount of error that is unique to the training set. __Overfitting is the problem of fitting a model too well to the training set.__ __This could result in the model having poor predictive power when applied to a new dataset.__ During model training, you want to meet a balance between fitting a model with good accuracy (i.e., one that reduces error), without trying to account for so much error in the training model that you overfit the model.
+
+
+# A Regression Example
+
+One great source of data sets for practicing machine learning is kaggle.com. We will be using a data set that was posted to kaggle.com: https://www.kaggle.com/uciml/red-wine-quality-cortez-et-al-2009
+
+Here, they've measured several physical traits (e.g., acidity; density) of 1,599 bottles of wine from the Minho region of Portugal. Each bottle was also rated by three sensory assessors (taste testers) on a scale of 0 ("very bad") to 10 ("excellent"). The quality of the wine was then taken to be the median rating from these three sensory assessors. Can we use the chemical properties of each bottle of wine to predict how highly the wine was rated?
+
+```{r}
+# read in data
+data <- read.csv('winequality-red.csv')
+
+# examine data
+head(data)
+str(data)
+
+# check correlations among predictors
+round(cor(data),2) 
+```
+
+Some of the correlations between predictors are quite high, suggesting multicollinearity could pose an issue. Ridge regression is one method for handling situations of multicollinearity. 
+
+How much of the data should be used in the training set and how much of the data should be used in the test set? Well, if we include more data in the training set we will have less bias (because we are better able to explain the underlying structure of the data) but we will have more variance (we risk overfitting our model to the data). A general rule of thumb for the training/testing set is somewhere between 60%/40% and 80%/20%. Here we will use 80%/20%. 
+
+
+## Data Splitting
+
+For this example, we'll go with an 80% training/20% testing set split.
+```{r}
+# set a random seed so that your results replicate
+set.seed(42) 
+
+# split the data
+data_split <- initial_split(data = data, prop = .80)
+
+# look at the data_split object
+data_split
+
+# isolate the split data
+data_train <- training(data_split)
+data_test  <- testing(data_split)
+
+# look at data_train and data_test
+head(data_train)
+head(data_test)
+
+# check our results
+nrow(data_train) / nrow(data)
+nrow(data_test)  / nrow(data)
+```
+
+## Model Training
+
+`caret` is an R package that consolidates all of the many various machine learning algorithms into an easy-to-use interface. 
+
+The `train` function is used for model training. It uses the following inputs: 
+
+- **y** = the outcome variable; y ~. means predict y from all other variables in the dataset
+- **method** = the machine learning algorithm
+- **trControl** = the cross-validation method
+- **tuneGrid** = a data frame of the hyperparameters that you want to be evaluated during model training
+- **preProc** = any pre-processing adjustments that you want done on the predictor data
+
+
+### Pre-processing
+
+For ridge regression, it's important that the predictors are centered and scaled. We can specify these pre-processing adjustments in the `preProc` argument of the `train` function. 
+
+
+### Cross-Validation
+
+Specify that we want to do k-folds cross-validation with 10 folds.
+```{r}
+train.control <- trainControl(method="cv", number = 10) # k-folds CV with k=10
+```
+
+
+### Tuning
+```{r}
+# Model tuning
+glmnet.info <- getModelInfo("glmnet")
+glmnet.info$glmnet$parameters # the hyperparameters are alpha and lambda
+
+# The following will test values between 0 and 1 for alpha, and between 0.0001 and 1 for lambda during the model tuning process
+tune.grid <- expand.grid( #expand.grid is the function that allows you to specify values that you want to feed into the model training function
+  alpha = 0:1, # alpha of 0 is ridge regression, alpha of 1 is lasso regression
+  lambda = seq(0.001, 1, length = 100)
+) # these values are rules-of-thumb for glmnet in particular
+```
+
+
+### Build Model using Training Set
+
+We'll be using the elastic net ML algorithm called `glmnet` in caret. It's good to use when you have issues of multicollinearity or small samples because it combines corrections made by ridge regression and lasso regression.
+
+Lasso regression penalizes having too many non-zero coefficients.
+Ridge regression penalizes having too many large coefficients.
+
+They do so by adding a penalty term called a `shrinkage` penalty because it moves coefficients towards zero.
+
+In other words, the elastic net algorithm is looking for the most parsimonious model with either a few, non-zero coefficients or several, small coefficients. This is good for avoiding overfitting.
+```{r}
+# Use the train function to perform model training
+glmnet.model <- train(quality ~ ., 
+                      data = data_train, 
+                      method = "glmnet", 
+                      trControl = train.control, 
+                      tuneGrid = tune.grid,
+                      preProc = c("center", "scale")) # specify that the predictors should be centered and scaled
+
+
+# Look at the results from model training
+## See the final hyperparameter values from the tuning process
+glmnet.model$bestTune
+glmnet.model$results
+
+## See the model coefficients from our final model
+coef(glmnet.model$finalModel, glmnet.model$bestTune$lambda)
+```
+
+
+### Measure Predictive Accuracy in Testing Set
+```{r}
+predictions <- predict(glmnet.model, data_test) # Predict values in the testing set
+
+# Calculating RMSE and R^2
+data.frame(
+  RMSE    = RMSE(predictions, data_test$quality),
+  Rsquare = R2(predictions,   data_test$quality)
+)
+```
+
+
+
+# A Classification Example
+
+Suppose I don't care about an exact rating, I just want to know whether I want to drink the wine. I only want to drink wines that are a 6 or better.
+
+```{r}
+# create dichotomous variable
+data <- data %>%
+  mutate(quality_category = ifelse(quality > 5, 'good', 'bad'))
+
+# check that it worked
+data %>%
+  select(quality,
+         quality_category) %>%
+  head()
+
+# convert to factor
+data$quality_category <- as.factor(data$quality_category)
+```
+
+This time, we'll use a machine learning algorithm called `svmLinear`. For a list of which algorithms you can use see: https://topepo.github.io/caret/available-models.html
+
+## Data Splitting
+
+```{r}
+# split the data
+data_split <- initial_split(data = data, prop = .80, strata = quality_category) # have equal numbers of good/bads in each group
+
+# isolate the split data
+data_train <- training(data_split)
+data_test  <- testing(data_split)
+
+# check our results
+nrow(data_train) / nrow(data)
+nrow(data_test)  / nrow(data)
+
+#check balance of categories
+table(data_train$quality_category) / nrow(data_train)
+table(data_test$quality_category) / nrow(data_test)
+```
+
+## Model Training 
+
+### Pre-processing
+
+Again, we'll center and scale the predictors.
+
+### Cross-Validation
+
+Let's stick with k-folds cross-validation with 10 folds.
+```{r}
+train.control <- trainControl(method="cv", number = 10) # k-folds CV with k=10
+```
+
+
+### Tuning
+```{r}
+# Model tuning
+svmLinear.info <- getModelInfo("svmLinear")
+svmLinear.info$svmLinear$parameters # the hyperparameter is C
+
+tune.grid <- expand.grid(C = seq(from = .1, to = 2, length = 20))
+```
+
+
+### Build Model using Training Set
+```{r}
+# Use the train function to perform model training
+svmLinear.model <- train(quality_category ~ ., 
+                      data = select(data_train, -quality), 
+                      method = "svmLinear", 
+                      trControl = train.control, 
+                      tuneGrid = tune.grid,
+                      preProc = c("center", "scale"))
+
+# Look at the results from model training
+## See the final hyperparameter value from the tuning process
+svmLinear.model$bestTune
+svmLinear.model$results
+
+# Getting the model coefficients
+coefs <- svmLinear.model$finalModel@coef[[1]] 
+mat <- svmLinear.model$finalModel@xmatrix[[1]]
+
+coefs %*% mat
+```
+
+
+### Measure Predictive Accuracy in Testing Set
+```{r}
+predictions <- predict(svmLinear.model, data_test) # Predict values in the testing set
+
+# compare predictions vs actual
+data.frame(actual    = data_test$quality_category,
+           predicted = predictions)
+
+# compute model accuracy 
+accuracy_test_svm <- mean(predictions == data_test$quality_category)
+accuracy_test_svm 
+
+# confusion matrix
+confusionMatrix(predictions, data_test$quality_category) 
+```
+
+
+# Comparing Accuracy of Different ML Algorithms
+
+Let's also fit the classification model using two more ML algorithms - elastic net and random forest - to see which performs the best.
+
+First, elastic net.
+```{r}
+# elastic net
+
+## cross-validation
+train.control <- trainControl(method="cv", number = 10) 
+
+## tuning
+tune.grid <- expand.grid( 
+  alpha = 0:1, 
+  lambda = seq(0.001, 1, length = 100)
+)
+
+## model building 
+elasticnet.model <- train(quality_category ~ ., 
+                      data = select(data_train, -quality), 
+                      method = "glmnet", 
+                      trControl = train.control, 
+                      tuneGrid = tune.grid,
+                      preProc = c("center", "scale"))
+
+## Measure Accuracy in Testing Set
+predictions <- predict(elasticnet.model, data_test)
+accuracy_test_elastic <- mean(predictions == data_test$quality_category)
+accuracy_test_elastic
+```
+
+Second, random forest.
+```{r}
+# random forest
+
+## cross-validation
+train.control <- trainControl(method="cv", number = 10) 
+
+## tuning
+tune.grid <- expand.grid(mtry = c(1, 2, 3, 4))
+
+## model building 
+randomforest.model <- train(quality_category ~ ., 
+                      data = select(data_train, -quality), 
+                      method = "rf", 
+                      trControl = train.control, 
+                      tuneGrid = tune.grid,
+                      preProc = c("center", "scale"))
+
+## Measure Accuracy in Testing Set
+predictions <- predict(randomforest.model, data_test)
+accuracy_test_rf <- mean(predictions == data_test$quality_category)
+accuracy_test_rf
+```
+
+
+Gather training set & testing set accuracies from the three models to compare.
+```{r}
+## Accuracy in Training Set
+accuracy_train <- c(svmLinear.model$results[1,2], # Final model used was #1, accuracy is column #2
+                    elasticnet.model$results[102,3], # final model used was #102, accuracy is column #3
+                    randomforest.model$results[3,2]) # final model used was #3, accuracy is column #2
+
+## Accuracy in Testing Set
+accuracy_test <- c(accuracy_test_svm,
+                   accuracy_test_elastic,
+                   accuracy_test_rf)
+
+
+model_names <- c("SVM", "Elastic Net", "Random Forest")
+
+difference <- as.numeric(accuracy_test) - as.numeric(accuracy_train)
+data.frame(cbind(model_names, accuracy_train, accuracy_test, difference))
+```

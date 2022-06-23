@@ -1,0 +1,180 @@
+---
+title: 'Lecture 13: Logistic Analysis'
+author: "ETB"
+date: "5/10/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#rm(list=ls())
+library(ggplot2)
+library(knitr)
+library(here)
+library(rio)
+library(tidyverse)
+# setwd('~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data/')
+```
+
+## Bring in the data
+
+```{r import data}
+# Get the data (note that it's in a CSV today)
+data.logit <- import(here("Data", "Lecture13IPV.csv"),
+                     setclass = "tibble")
+#look at our data to get familiar
+head(data.logit)
+#note what we're looking at is reasons people give for being in a relationship
+#in order to predict likelihood of intimate partner violence
+
+# Convert the outcome to a factor
+data.logit$AnyPhys = factor(data.logit$AnyPhys) #any physical aggression
+```
+
+## Run the actual model
+
+```{r run the logit model and inspect it}
+
+# Run the model using the "glm()" function
+logitModel = glm(AnyPhys ~ EXTSCORE, #EXTSCORE is extrinsic motivation
+                 data = data.logit, 
+                 family= binomial(link="logit"), 
+                 na.action=na.omit) 
+
+# Summary. Remember that the bs are LOG ODDS
+summary(logitModel)
+#Null Deviance refers to model with no predictors
+#Residual Deviance includes predictor
+#note the change in deviance score; it's indicative of what we WANT
+#we want it to go down when we add a predictor
+#note you can use a deviance change test (chi square distributed)
+anova(logitModel, test = "Chisq")#passing through ANOVA does the changes test for you
+#=model comparison
+
+# Exponent of the model to get the odds
+exp(coef(logitModel))
+
+```
+
+## Classification table
+
+```{r fitted values}
+
+# Fitted values and thresold
+Yhat <- fitted(logitModel)
+thresh  <- 0.5
+
+# Dichotomize accordint to predicted values and threshold
+YhatFac <- cut(Yhat, breaks=c(-Inf, thresh, Inf), labels=c("Predicted No", "Predicted Yes"))
+
+# Make a contingency table, omitting cases where EXTSCORE has missing data
+levels(data.logit$AnyPhys) <- c("Absent", "Present")
+cTab <- table(subset(data.logit$AnyPhys, data.logit$EXTSCORE!="NA"), YhatFac)
+# Does anyone know why this table is so ugly?
+kable(cTab, format="markdown", align="c", caption="Predicted versus actual outcomes")
+
+# percentage correct for training data
+sum(diag(cTab)) / length(subset(data.logit$AnyPhys, data.logit$EXTSCORE!="NA"))
+```
+
+## Plotting
+
+The following is from Stack Overflow: http://stackoverflow.com/questions/26694931/how-to-plot-logit-and-probit-in-ggplot2. It's a nice example of plotting the (fitted) model along with the raw data points. It involves creating predicted values based on the model output (using the "predict" function) then plotting the results of that model. 
+
+```{r plot single predictor LR}
+
+# Create a temporary data frame of hypothetical values
+# Create a variable to represent "EXTSCORE" along the x-axis
+temp.data <- data.frame(EXTSCORE = seq(-55,18,.01))
+
+# Predict the fitted values given the model and hypothetical data
+predicted.data <- as.data.frame(predict(logitModel, newdata = temp.data, type="link", se=TRUE))
+
+# Combine the hypothetical data and predicted values
+new.data <- cbind(temp.data, predicted.data)
+
+# Calculate confidence intervals and put them in the "new.data" frame
+std <- qnorm(0.95 / 2 + 0.5)
+new.data$ymin <- logitModel$family$linkinv(new.data$fit - std * new.data$se)
+new.data$ymax <- logitModel$family$linkinv(new.data$fit + std * new.data$se)
+new.data$fit <- logitModel$family$linkinv(new.data$fit)  # Rescale to 0-1
+
+# Plot the actual data (in "data.logit") and the fitted data (in "new.data")
+p <- ggplot(data.logit, aes(x=EXTSCORE, y=as.numeric(AnyPhys)-1))
+p + geom_point() +
+    geom_ribbon(data=new.data, aes(y=fit, ymin=ymin, ymax=ymax), alpha=0.5) +
+    geom_line(data=new.data, aes(y=fit)) + 
+    labs(x="Extrinsic Relationsip Motivation", y = "P(Physical Aggression)")
+
+```
+
+
+## Hierarchical model
+
+```{r Hierarchical (stepwise) model}
+logitModel2 = glm(AnyPhys ~ CHILDS + EXTSCORE, data = data.logit, family = "binomial")
+logitModel3 = glm(AnyPhys ~ CHILDS * EXTSCORE, data = data.logit, family = "binomial")
+summary(logitModel2)
+exp(coef(logitModel2))
+
+# Compare to previous model
+anova(logitModel, logitModel2, logitModel3, test = "Chisq")
+
+## Add the interaction
+logitModel3 = glm(AnyPhys ~ c_Ext*c_childs, data = data.logit, family = "binomial")
+summary(logitModel3)
+
+mean(data.logit$c_childs)
+
+# Compare the previous models
+anova(logitModel2, logitModel3, test = "Chisq")
+```
+
+
+## Plotting logistic regression
+
+```{r plot the relationship in probability terms}
+# Create a variable to represent "EXTSCORE" along the x-axis
+ext <- seq(-55,18,.01)
+
+# P(violence) as a function of EXTSCORE
+# b0 = -.086
+# b1 = .032
+p_v <- exp(-.086 + ext*.032) / (1+exp(-.086 + ext*.032))
+
+# Plot ext (on x) by p_v (on y) in black
+plot(ext,p_v, type="l", col="black", xlab="Extrinsic motivation score", ylab="P(violence)", main="Probability of committing violence as a function of EXT score")
+
+# Plot a dashed red horizontal line along the range of extscore at p = .05
+size_ext <- length(ext)
+lines(ext,rep(0.5, size_ext), type="l", col="red", lty=2)
+
+# Plot a dashed blue vertical line along the range of P(violence) at the threshold
+# Threshold = -b0 / b1
+thresh <- .086/.032
+size_p_v = length(p_v)
+lines(rep(thresh,size_p_v),seq(0,1,len=size_p_v), type="l", col="blue", lty=2)
+
+# Plot the interaction between "ext" and "childs" in predicting violence
+ext_c <- seq(-35, 38, .01)
+high_childs <- 0.12 + 0.055*ext_c
+avg_childs <- -0.852 + 0.023*ext_c
+low_childs <- -1.82 - 0.009*ext_c
+
+p_pa_high_childs <- exp(high_childs) / (1+exp(high_childs))
+p_pa_avg_childs <- exp(avg_childs) / (1+exp(avg_childs))
+p_pa_low_childs <- exp(low_childs) / (1+exp(low_childs))
+
+plot(ext_c, p_pa_high_childs, type="l", col="blue", xlab = "Extrinsic motivation score (centered)", ylab="P(violence | ext, childs)", main="Probability of committing violence as a function of EXT score")
+lines(ext_c, p_pa_avg_childs, type="l", col="green")
+lines(ext_c, p_pa_low_childs, type="l", col="red")
+legend(-35, 0.9, c("Probability of PA for High childish behavior", "Probability of PA for average childish behavior", "Probability of PA for low childish behavior"), col=c("blue", "green", "red"), lty=c(1,1,1))
+```
+

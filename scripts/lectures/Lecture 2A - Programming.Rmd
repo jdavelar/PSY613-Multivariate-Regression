@@ -1,0 +1,566 @@
+---
+title: "Lecture 3"
+author: "ETB"
+date: "4/5/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+To run the code in this file, rather than copying and pasting in the console, put your cursor on the line you want to run and hit Command Enter (on a Mac) or Control Enter on PC. If you want to run multiple lines of code at once, you can highlight those lines and use the keyboard shortcut.
+
+
+## Getting help
+
+A reminder! Help is always a good thing
+
+```{r help}
+x = matrix(c(2, 1,-1, -1, -1, 1, -1, -5, -5, 10, 2, 2, 2, 2, -8), byrow=TRUE, ncol=5)
+
+# Want the reduced row echelon form? 
+# Can't find it? What do we do?!?
+
+?rref #try to search help, the single question mark doesn't work
+??rref #searches all documentation, we find it in the pracma package
+??"row echelon" #also finds it - if you're not sure what the function name is you can search as a 
+#string! The help window tells us what we want is in the pracma package.
+
+#install.packages("pracma")
+library(pracma)
+rref(x) #only one piece of unique information in this matrix (not surprisingly since the rows
+#are identical!)
+
+```
+
+## Random numbers
+```{r Random numbers}
+
+## RANDOM NUMBERS
+runif(1) # generates 1 random number from a uniform distribution from 0 to 1 (as defaults)
+runif(2, min=3, max=5) # generates 2 random numbers from a uniform distribution from 3-5
+
+# NOTE: The magical up arrow!
+# can hit the up arrow and run this again and again - draw lots of samples of 2
+# can hit the up arrow and change things:
+# up arrow gives you this runif(2, min=3, max=5) if you haven't yet run the line, you can edit
+# any of the values.
+
+# sample gives whole numbers
+sample(1:10,3) # without replacement
+sample(1:10,3,replace=TRUE) # keep running this you might get a couple #s that are the same
+sample(1:5, 300, replace=TRUE) # more likely to get numbers that are the same since it's a bigger sample
+
+# can create a matrix of random numbers
+x <- matrix(runif(100), ncol=1) # 100 row, 1 column vector of random numbers from a uniform dist.
+x <- rnorm(5000) # 5 numbers from a normal dist. w/ mean=0 SD=1
+mean(x)
+# can set parameters of the normal distribution
+x <- rnorm(1, mean=100, sd=15) # draw one number from normal dist. w/ mean=100, SD=15 (e.g., 1 IQ score)
+
+```
+
+
+##Flow control
+
+These are general programming tools that are available in many languages including R. You can do quite a few amazing things with just these simple things:
+ * if/else statements
+ * for loops
+ * logical (boolean) operators
+ 
+ Logical operators:
+
+```{r logic}
+
+a = 3 #assigning a value of 3 to a
+a <- 3
+3 -> a
+
+a==3 #does a equal 3? YES
+a==4 #does a equal 4? NO
+
+a=4 #if I do this
+a == 4 #now a is equal to 4
+a == 3 #...and not equal to 3
+a != 4 #is a NOT equal to 4? NO
+a != 3 #is a NOT equal to 3? YES
+
+# < and > (tip - the PacMan wants to eat whatever is bigger, e.g. 4>3 or 5<10)
+# <= >= less than or equal to and greater than or equal to
+```
+
+If/Else statements: a rake in the garden of forking paths
+
+Basic structure of "if" statements:
+  if (LOGICAL CONDITION IS TRUE) {
+    DO SOMETHING }
+  else if (OTHER LOGICAL CONDITION) {
+    SOMETHING ELSE }
+  else {
+    (a third possibility) }
+
+
+```{r ifelse}
+#get a random number from a uniform distribution
+x <- runif(1)
+x
+
+#if this number is greater than .5 print "it's heads", less than .5 print "it's tails"
+
+x <- runif(1)
+x
+
+
+if (x>.5) {
+  print("It's heads!")
+} else {
+  print("It's tails.")
+}
+
+
+x <- runif(1)
+
+if (x<(1/3)) {
+  print("It's a one!")
+} else if (x<(2/3)) {
+ print("It's a two!") 
+} else {
+  print("It's a three!")
+} 
+
+#can do this over and over again using up arrow
+```
+
+For loops: do the same operation to a variable a fixed number of times
+
+Basic structure:
+
+for (VARIABLE in VECTOR) {do this thing, where VARIABLE changes each iteration through the loop}
+
+```{r for loops}
+
+#simple for loop
+for (i in 1:5) { print( paste("i=", i) ) }
+
+x = 0
+for (i in 1:10) {
+  x = x+i
+  print(x) }
+
+data = c(6,NA,3,7,3,NA,8)
+n_trials = length(data)
+
+for (trial in 1:n_trials) {
+  if (is.na(data[trial])) {
+    data[trial] = -1
+  }
+}
+
+data
+
+# Here is another way of accomplishing that same thing
+
+data = c(6,NA,3,7,3,NA,8)   # Restore "data" to what it was before
+is.na(data)  # Show us what the 'is.na()' function does
+
+# Now, set all of the "TRUE" spots within data[] to be -1
+data[is.na(data)] = -1
+data
+
+# for each value, 1 thru 5 print i=that value
+
+#nested for loops
+
+#first, create a matrix
+x <- zeros(3,4)  #3x4 matrix of zeros
+
+for (r in 1:3)  {    #for every row from 1-3, starting with first row
+  for (c in 1:4)  {  #go column by column (in that row) starting with 1
+    x[r,c]=r*10+c       #the value that goes into that spot is rows + columns
+  }
+} #make sure you have the appropriate number of brackets
+
+#check out the matrix now
+#it shows each value in the matrix as the row number plus the column number
+
+#another example of a for loop
+
+for(n in c(5,10,20,100,10000)) {
+  x=runif(n)
+  print(sd(x))
+}
+```
+
+## Example simulation 1
+
+I have heard that we can use the binomial distribution to figure out probabilities of count variables. For example, if I want to know the likelihood of getting exactly 8 heads out of 10 coin flips, I can look it up in the binomial probability distribution function, which simply follows the formula:
+
+![Binomial density function](http://hyperphysics.phy-astr.gsu.edu/hbase/Math/immath/bindiscom.gif)
+
+```{r}
+dbinom(8,10,0.5)
+```
+
+But now suppose I don't trust the dbinom() function for whatever reason, and I want to check it myself. How could I do that?
+
+Well, I could flip 10 coins a bunch of times - like a TON of times - and count how many times I get 8 heads. We can use for loops for that!
+
+As a first step, I could figure out how to just flip 10 coins. We can use the sample() function for that, where 1 = heads and 0 = tails:
+
+```{r}
+one_try = sample(0:1,10, replace=TRUE)
+one_try
+```
+
+Now, I can figure out the number of heads by counting the "1"s, or just summing up the sample:
+
+```{r}
+nHeads = sum(one_try)
+nHeads
+```
+
+OK, now that we have a way of counting heads from a set of 10 flips, we need to repeat that process. We'll use a "for" loop for that:
+
+```{r}
+
+for (samples in 1:1000000) {
+  one_try = sample(0:1,10, replace=TRUE)
+  nHeads = sum(one_try)
+}
+
+```
+
+The problem here is that this is running the two lines of code _one million_ times but not actually saving the output anywhere. To do that, we need to create a *storage variable* - somewhere to stick the data. So let's create one, "storage"
+
+```{r loop with storage}
+
+storage = vector()
+
+for (samples in 1:1000000) {
+  
+  #First, flip 10 coins
+  one_try = sample(0:1,10, replace=TRUE)
+  
+  #Second, count how many heads there are
+  nHeads = sum(one_try)
+  
+  #Third, put the count for "one_try" into the storage var
+  storage[samples] = nHeads
+  
+}
+
+hist(storage)
+
+```
+
+OK, that seemed to work! Now we just need to figure out how many times we got 8 heads. One way to do this would be to loop through (using a for loop!) and then use if
+```{r summing8s}
+
+nEights = 0
+for (headCounts in 1:1000000){
+  if (storage[headCounts]==8) {nEights = nEights+1}
+  else { nEights = nEights }
+}
+
+nEights
+
+```
+
+A simpler way to do this same thing would be to use a logical statement and sum
+```{r counting8s}
+
+nEights = sum(storage==8)
+nEights
+
+```
+
+So, our observed probability of 8 heads out of 10 coin flips is:
+```{r pobs}
+pobs = nEights/1000000
+```
+
+And our probability from the built-in function was:
+```{r ppred}
+ppred = dbinom(8,10,0.5)
+```
+
+How'd we do?
+```{r compare}
+pobs
+ppred
+```
+Not too shabby! We can get a measure of accuracy by comparing those two numbers:
+```{r accuracy}
+accuracy = pobs-ppred
+accuracy
+```
+
+Now, suppose we want to see how that accuracy changes as a function of the number of times we flip 10 coins. (Remember, the first time around we did it a million times.) How would you do that?
+
+Well, we would *embed our for loop in _another_ for loop*!
+```{r for for}
+
+number_of_sets = c(5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1500, 1800, 2000, 5000, 10000, 50000, 100000, 1000000)
+
+accuracy_of_set = vector()
+
+for (set in 1:length(number_of_sets)) {
+  
+  storage = vector()
+  
+  for (samples in 1:number_of_sets[set]) {
+    one_try = sample(0:1,10, replace=TRUE)
+    nHeads = sum(one_try)
+    storage[samples] = nHeads
+  }
+  
+  nEights = sum(storage==8)
+  phat = nEights/number_of_sets[set]
+  ppred = dbinom(8,10,0.5)
+  accuracy_of_set[set] = phat-ppred
+
+}
+
+accuracy_of_set
+```
+
+And we could even plot it:
+```{r plot accuracy as number of sets}
+plot(log(number_of_sets), accuracy_of_set)
+``` 
+
+
+## Example simulation 2
+
+Another thing you can do using the same basic logic is to run a permutation simulation to empirically derive the null sampling distribution of a test statistic. For instance, recall the simple two-groups t-test we worked on in the first two lectures:
+
+Group 1: 1, 2, 3, 4
+Group 2: 5, 6, 7, 8
+
+Now, suppose we didn't know what a t-test was and so had no idea what the t-distribution looked like. How could we test the difference between these two groups?
+
+Start by remembering that this situation has two variables, a DV (numbers 1:8) and an IV (binary group assignment):
+
+```{r data into a df}
+df = data.frame(DV = 1:8, IV = c(0, 0, 0, 0, 1, 1, 1, 1))
+df
+```
+We can estimate the difference between the two groups by comparing the means:
+
+```{r comparing groups}
+
+group_diff = mean(df$DV[df$IV==1]) - mean(df$DV[df$IV==0])
+group_diff
+```
+
+Under the null hypothesis, there is no difference between the groups _because they are drawn from the same distribution_. That means that -- under the null -- the binary IV is meaningless. Which means that we can freely shuffle the assignment accordingly. We can use the `sample` function to accomplish this:
+
+```{r random permutation}
+permutation_of_DV = sample(df$DV, replace=TRUE)
+permutation_of_DV
+```
+
+Once we have that, we can repeat the group comparison, this time with a shuffled IV, which we can think of as an independent variable drawn from the null distribtion (where there is no true difference between the groups):
+
+```{r comparing shuffledroups}
+
+group_diff = mean(permutation_of_DV[df$IV==1]) - mean(permutation_of_DV[df$IV==0])
+group_diff
+```
+
+Of course, that was just _one_ random permutation. Suppose we wanted to do that a bunch of times, each time recording the group difference. If we did that enough times, we could draw a _sampling distribution_ of the mean difference under the null hypothesis:
+
+```{r null sampling distribution}
+
+mean_diff_storage = vector()
+n_permutes = 100000
+  
+for (permutation in 1:n_permutes) {
+  permutation_of_DV = sample(df$DV, replace=TRUE)
+  group_diff = mean(permutation_of_DV[df$IV==1]) - mean(permutation_of_DV[df$IV==0])
+  mean_diff_storage[permutation] = group_diff
+}
+
+hist(mean_diff_storage)
+
+```
+
+Finally, we might want to add a nice vertical line showing where our observed sample difference is and we can calculate its percentile:
+```{r observed-vs-null-dist}
+
+hist(mean_diff_storage)
+group_diff = mean(df$DV[df$IV==1]) - mean(df$DV[df$IV==0])
+abline(v = group_diff, col="red", lwd=3, lty=2)
+
+# Calculate percentile
+n_greater = sum(mean_diff_storage>=group_diff)
+percentile = n_greater / n_permutes
+
+print(paste0("The probability of drawing two groups with the observed difference or larger is ", percentile))
+
+```
+
+## Plotting
+
+Rudimentary plots
+
+```{r plotting}
+
+# get some data and plot it
+plot(sin(seq(-pi,pi,.01))) # plot the sin of every value in the sequence between -pi and pi
+
+# could just as easily plot 1 to 10
+plot(seq(1,10,1))
+
+# plot that as a line
+plot(seq(1,10,1), type='l')
+
+# can plot 2 graphs on the same plot
+# get some data 
+x <- seq(-pi,pi,.01)
+
+# create one plot
+plot(x,sin(x))
+
+# keep the plot open to overlay something else
+par(new=TRUE)
+
+# plot another graph in a different color so we can easily see the two different graphs
+plot(cos(x), col="green")
+
+# here's another way to do it
+lines(tan(x),col="blue") #puts things in same plot, but doesn't overwrite
+
+# get a different x
+x <- rnorm(100, mean=100, sd=15) #100 values from normal dist. w/ mean=100, SD=15
+# can check mean and sd of our sample
+mean(x)
+sd(x)
+# pretty close to the parameters we set because the sample size is large 
+# probably wouldn't be as close if sample size was 5
+
+# get a histogram of x
+hist(x)
+
+# can do fancier stuff
+hist(x,20) # histogram of x with 20 bins
+hist(x,20, xlab="IQs", main="Histogram of IQs") #title and axes
+
+# line graphs
+x <- seq(-3,3,.01)
+plot(sin(x)) # we already saw this above
+
+# can give values for the x and y axis
+plot(x,sin(x))
+
+# Sometimes it's easier to plot things using colors instead of numbers
+design = matrix(c(sin(x),cos(x)), ncol=2)
+image(design)
+image(design,main="my design", col=terrain.colors(1000))
+
+# now let's look at bar plots - get some categorical data
+x <- c(10,8,7,7,5)
+barplot(x,main="Some RTs", xlab="Group")
+
+## NOTE: lots of different things you can do with plots
+## harding.edu/fmccown/r/#linecharts
+
+# label the bars
+barplot(x,main="Some RTs", xlab="Group", names.arg=c("One", "Two", "Three", "Four", "Five"))
+
+# add some color
+barplot(x,main="Some RTs", xlab="Group", names.arg=c("One", "Two", "Three", "Four", "Five"), col=rainbow(5))
+
+# add a legend (probably don't really need this here since bars are labeled...)
+legend("topright", c("One", "Two", "Three", "Four", "Five"), cex=0.6, bty="n", fill=rainbow(5))
+
+
+## LINE GRAPHS w/ fancy-ish stuff
+
+# compare cars and trucks
+cars <- c(1,3,6,4,9)
+trucks <- c(2,5,4,5,12)
+
+# make a graph for cars. using points connected by a line, y axis ranges from 0 to 12.
+plot(cars, type='o',col="blue",ylim=c(0,12),ann=FALSE)
+
+# ann=FALSE means that R shouldn't label the axes, asking it not to automatically label the y axis right now
+# because it would just be labeled cars and we want to plot trucks, too.
+
+# graph trucks on the same plot w/ a red dashed line and square points
+lines(trucks, type='o',pch=22,lty=2,col="red")
+
+# add a title & labels for axes
+title(main="Autos",col.main="red",font.main=4, xlab="Count", ylab="Total")
+
+```
+
+## Input and Output
+
+How go get data into R from the command line
+```{r input}
+#input 
+
+#use readline function to get a string
+
+#t <- readline(prompt="Give me some text:")
+#now t is whatever you told it, look at t
+
+#t <- readline(prompt="Enter a number:")
+
+#class(t) #note that it's not a number right now
+#t+2 #can't add using t
+
+#can change the class of the variable
+#t <- as.integer(t)
+#class(t)
+#t+2 #now can add the numeric variable
+
+#t2 <- as.integer(readline(prompt="Give me a number:"))
+#class(t2) #it's already an integer!
+```
+
+Output: How to get R to present data to you
+```{r output}
+
+#use print to write text to the screen
+print("You entered:")
+
+#...and you can use paste to merge text and variables
+print(paste("You entered", 5))
+
+#...so we can combine these two things
+#x <- readline(prompt="Enter a number:")
+#print(paste("You entered", x))
+```
+
+
+## Other useful docs
+
+Graphs_in_R_4.9.15.Rmd
+Lecture4_IWantNumbers.Rmd (we'll review this in lab on Friday)
+
+Helpful websites for learning and using R:
+R references:
+
+R for Cats - an intro to R:
+(the best one - this is where you can get the catfacts package that I showed in class >^..^< )
+http://rforcats.net/
+ 
+Simple graphs is R:
+http://www.harding.edu/fmccown/r/#linecharts
+
+Equivalent R and Matlab Functions (also useful for just searching for r functions):
+http://cran.r-project.org/doc/contrib/Hiebeler-matlabR.pdf
+
+A list of colors to use when graphing in R:
+http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf
+

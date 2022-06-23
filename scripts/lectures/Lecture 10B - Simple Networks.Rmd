@@ -1,0 +1,320 @@
+---
+title: "Network Analysis in R"
+author: ""
+date: "6/2/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(rio)
+
+## Uncomment the following line to install all of the network analysis related packages
+#install.packages(c("network", "igraph", "tidygraph", "visNetwork", "networkD3", "qgraph", "ggraph"))
+
+library(network)
+library(igraph)
+library(tidygraph)
+library(visNetwork)
+library(networkD3)
+library(qgraph)
+library(ggraph)
+```
+
+
+We're going to construct a node list and, more importantly, an edge list representing the friend network in our lecture example.
+
+# Node List
+
+Recall that nodes are the objects that we are wanting to understand the interconnections between. For this example, our objects (aka, nodes) are the friends that we are representing friendships between.
+
+The node list is a data frame (or *tibble*) containing a unique ID number for each node in our network, and you can also include a column that provides the names of each node (called *label*).
+
+A node list can also contain **node attributes**, which are variables that pertain to each of the nodes in the list (e.g., age, height, shoe size). 
+
+```{r}
+nodes <- c("Ada", "Barb", "Cruz", "Dek", "Ema", "Ful", "Gal") %>%
+  as_tibble() %>%
+  rename(label = value)
+
+nodes
+
+# Add an ID number
+nodes <- nodes %>% 
+  rowid_to_column("id")
+
+nodes
+```
+
+# Edge List
+
+Recall that an edge is a connection (aka, line) between two nodes that represents a relationship between them. In this case, each edge represents a friendship between two friends in the network. 
+
+The edge list has to contain a minimum of two columns:
+
+* The *source* node (from)
+* The *destination* node (to)
+
+You can also create a column of
+* Weights to assign to each edge (e.g., count, correlation, etc.)
+
+```{r}
+from_label <- c("Ada", "Ada", "Ada", "Barb", "Cruz", "Dek", "Dek", "Dek") %>%
+  as_tibble() %>%
+  rename(from_label = value)
+
+to_label <- c("Barb", "Cruz", "Dek", "Dek", "Dek", "Ema", "Ful", "Gal") %>%
+  as_tibble() %>%
+  rename(to_label = value)
+
+edges <- bind_cols(from_label, to_label)
+edges
+
+# Add ID numbers by using the same IDs from the node list
+
+## First, add ID numbers to the "from" column
+edges <- edges %>%
+  left_join(nodes, by = c("from_label" = "label")) %>%
+  rename(from = id)
+edges
+
+## Second, add ID numbers to the "to" column
+edges <- edges %>%
+  left_join(nodes, by = c("to_label" = "label")) %>%
+  rename(to = id)
+edges
+
+# Select just the columns with numeric IDs
+edges <- select(edges, from, to)
+edges
+```
+
+
+
+
+# Network Analysis using the `igraph` package
+
+From the igraph package, the `graph_from_data_frame()` function can be used to conduct network analysis. It takes the following arguments:
+
+* d = the edge list
+* vertices = the nodes list (igraph refers to nodes as vertices)
+* directed = set to TRUE for directed networks and FALSE for undirected networks
+
+```{r}
+network <- graph_from_data_frame(d = edges, vertices = nodes, directed = FALSE)
+
+# print the results
+network
+```
+
+Unpacking the output:
+* The UN-- breaks down to...
+  + U = undirected network
+  + N = has a name attribute
+  + -- the dashes mean the graph is not weighted, and not bipartite (not made up of two types of nodes) 
+
+* Following, UN--...
+  + The first number is the number of nodes (7)
+  + The second number is the number of edges (8)
+  
+* A list of the edges 
+  + For example, the first edge listed is a path from 1 to 2
+
+
+## Graphing the results using base R
+```{r}
+plot(network, 
+     layout = layout.graphopt, # a layout designed by Michael Schmuhl (http://www.schmuhl.org/graphopt/) that's meant to optimize the graph layout. See more layout options below.
+     vertex.size = 20,
+     vertex.color = "light blue",
+     vertex.frame.color = "yellow",
+     vertex.shape = "circle", # circle, square, rectangle, pie, sphere
+     vertex.label.color = "black",
+     vertex.label.cex = 1.5,
+     edge.color = "purple",
+     edge.lty = 2,
+     edge.arrow.size = 0.2) 
+```
+
+
+Other layout options:
+
+![](images/network_layouts1.JPG)
+![](images/network_layouts2.JPG)
+
+
+# Network Analysis using the `tidygraph` package
+
+From the `tidygraph` package, the `tbl_graph()` function can be used to produce network analysis results. It takes the following arguments:
+
+* nodes = the nodes list
+* edges = the edges list
+* directed = TRUE if directed, FALSE if undirected
+
+```{r}
+network2 <- tbl_graph(nodes = nodes, edges = edges, directed = FALSE)
+
+# see the output
+network2
+```
+
+The `tbl_graph` tells you the number of nodes (7) and edges (8), and gives you the first few rows of the nodes list and edges list.
+
+The list that says it is `active` can be manipulated with `dplyr` data wrangling functions. To change which list is active, pass it to the `activate()` function.
+
+```{r}
+# See the full output of the nodes or edges by activating that list and converting it to a dataframe
+network2 %>%
+  activate(nodes) %>%
+  data.frame()
+
+network2 %>%
+  activate(edges) %>%
+  data.frame()
+```
+
+## Graphing the results using ggraph
+
+### Basic Network Graph
+```{r}
+dev.off()
+
+ggraph(network2, layout = "graphopt") +
+  geom_edge_link() +
+  geom_node_point()
+
+ggraph(network2, layout = "graphopt") +
+  geom_node_point() +
+  geom_edge_link() +
+  geom_node_text(aes(label = label), repel = TRUE)
+```
+
+
+# Interactive Network Graphs
+
+`visNetwork()` is a package that can be used to create interactive network graphs.
+
+Pass the nodes list and edges list to the `visNetwork()` function.
+* The nodes list requires an "id" column
+* The edges list requires a "from" and "to" column
+  + Node labels are added using the "label" column from the nodes list
+
+```{r}
+visNetwork(nodes, edges)
+
+# adding a layout
+visNetwork(nodes, edges) %>%
+  visIgraphLayout(layout = "layout_nicely")
+```
+
+
+
+# Calculating Measures of Centrality
+The following centrality functions are from the `igraph` library.
+
+## Degree Centrality
+```{r}
+# Degree Centrality
+degree <- degree(network)
+degree
+cbind.data.frame(nodes, degree) # make it easier to see the names of each node next to their centrality scores
+```
+
+Recall that the degree centrality is simply the number of edges connected to each node.
+
+
+## Eigenvector Centrality
+```{r}
+# Eigenvector Centrality
+eigenvector <- eigen_centrality(network, scale = FALSE)$vector
+cbind.data.frame(nodes, eigenvector) 
+```
+
+
+## Betweenness Centrality
+```{r}
+# Betweenness Centrality
+betweenness <- betweenness(network, directed = FALSE)
+cbind.data.frame(nodes, betweenness)
+```
+
+When calculating the betweenness for a particular node (N), for every pair other pair of nodes, calculate the number of shortest paths between them. Then, calculate the number of the fraction of those shortest paths that node N is involved. Take the sum of all of these fractions for every other pair of nodes not involving node N.
+
+The number of pairs of nodes that you will calculate fractions for is equal to (where n is the number of nodes):
+
+* (n-1)(n-2)/2 = (6*5)/2 = 15
+
+For example, calculating the betweenness for Ada would involve using the following pairs of other nodes:
+
+Barb-Cruz, Barb-Dek, Barb-Ema, Barb-Ful, Barb-Gal, Cruz-Dek, Cruz-Ema, Cruz-Ful, Cruz-Gal, Dek-Ema, Dek-Ful, Dek-Gal, Ema-Ful, Ema-Gal, Ful-Gal
+
+For Ada.
+```{r}
+1/2 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1 + 0/1
+```
+
+For Dek.
+```{r}
+0/1 + 0/1 + 1/1 + 1/1 + 1/1 + 1/2 + 1/1 + 1/1 + 1/1 + 1/1 + 1/1 + 1/1 + 1/1 + 1/1 + 1/1
+```
+
+
+## Closeness Centrality
+```{r}
+# Closeness Centrality
+closeness <- closeness(network) 
+cbind.data.frame(nodes, closeness)
+```
+
+Recall that the closeness centrality is calculated by taking the inverse of the average distance between each node and every other node AND that in r, these values are then multiplied by 1/(n-1), where n represents the number of nodes, to standardize the maximum possible value.
+
+
+# Describing Communities
+
+## Network Density
+
+Network density is calculated by dividing the number of edges in the network by the total number of mathematically possible edges to give an idea of how *dense* the network is.
+```{r}
+edge_density(network)
+```
+
+
+## Clustering
+
+Let's identify the friend groups in this overall friendship network.
+```{r}
+friend_groups <- cluster_louvain(network) # the Louvain algorithm identifies clusters by trying to maximize the strength of the connections within groups and minimize connections between groups
+
+# How  many communities are there?
+unique(friend_groups$membership)
+
+# Who is in which community?
+friend_groups
+
+# Plot the friend groups
+plot(friend_groups, network)
+```
+
+
+## Transitivity
+
+Transitivity is also called the *clustering coefficient*. It is measured as the probability that nodes will be connected to adjacent nodes.
+
+The *global* transitivity measure is for the entire network. It is the ratio of the number of closed triangles (three connected nodes) out of the total number of possible closed triangles.
+```{r}
+transitivity(network, type = "global")
+```
+
+
+
+For another network analysis example using data from a directed network, see https://www.jessesadler.com/post/network-analysis-with-r/
+

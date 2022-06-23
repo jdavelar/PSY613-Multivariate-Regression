@@ -1,0 +1,72 @@
+---
+title: "Lecture 18 - MLM Precursors"
+author: "ETB"
+date: "5/26/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pracma)
+library(foreign)
+setwd("~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data")
+```
+
+## Load the data
+```{r Data}
+dataset = read.spss("Lecture18NELS88.sav", to.data.frame=TRUE)
+dataset$Schoolid = factor(dataset$Schoolid)
+dataset$studentid = factor(dataset$studentid)
+dataset$sex = factor(dataset$sex)
+dataset$race = factor(dataset$race)
+dataset$schooltype = factor(dataset$schooltype)
+dataset$urbanicity = factor(dataset$urbanicity)
+dataset$geography = factor(dataset$geography)
+summary(dataset)
+```
+
+
+## Build the models
+```{r Linear models}
+
+# Base model, only 1 "Level 1" predictor
+model0 = lm(mathscore ~ timeonmath, data=dataset)
+summary(model0)
+
+# Add in school (set of dummy codes)
+model1 = lm(mathscore ~ D1+D2+D3+D4+D5+D6+D7+D8+D9+timeonmath, data=dataset)
+summary(model1)
+
+# Add in school * time-on-math interaction (set of variables)
+model2 = lm(mathscore ~ D1+D2+D3+D4+D5+D6+D7+D8+D9+timeonmath + D1*timeonmath + D2*timeonmath + D3*timeonmath + D4*timeonmath + D5*timeonmath + D6*timeonmath + D7*timeonmath + D8*timeonmath + D9*timeonmath, data=dataset)
+summary(model2)
+
+```
+
+## Compare the models
+
+```{r Model comparison}
+anova(model0, model1)
+anova(model1, model2)
+```
+
+## Group-level data
+
+```{r Group data}
+
+dataGp <- read.spss("Lecture18NELS88_group.sav", to.data.frame = TRUE)
+summary(dataGp)
+head(dataGp)
+
+intModel <- lm(Int ~ Public, data = dataGp)
+summary(intModel)
+
+slpModel <- lm(Slope ~ Public, data = dataGp)
+summary(slpModel)
+
+```

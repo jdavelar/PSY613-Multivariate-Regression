@@ -1,0 +1,49 @@
+---
+title: "Lecture 17 - ICC"
+author: "ETB"
+date: "5/24/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pracma)
+setwd("~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data")
+```
+
+## Define the variables
+```{r Definitions}
+y = c(1:10)   # DV
+x = c(rep(0,5), rep(1,5)) # IV
+
+# X as a factor
+X = factor(x, labels=c("Group 1", "Group 2"))
+X
+
+```
+
+
+## First, fit a simple linear model
+```{r Linear model}
+
+# Fit a linear model (i.e., SOLVE FOR B, E)
+oneWayANOVA = lm(y ~ X)
+
+# Report the ANOVA table (df, SS, MS, F, p-val)
+results = anova(oneWayANOVA)
+results
+
+```
+
+## Pull out the ICC
+
+ICC = the sum-of-squares attributed to the model divided by the total sum-of-squares
+```{r ICC calculation}
+ICC = results$`Sum Sq`[1] / sum(results$`Sum Sq`)
+ICC
+```

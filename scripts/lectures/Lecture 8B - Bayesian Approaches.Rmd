@@ -1,0 +1,196 @@
+---
+title: 'Lecture 16: Bayesian Analysis'
+author: "ETB"
+date: "5/19/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+require(ggplot2)
+require(knitr)
+require(dplyr)
+require(BayesFactor)
+setwd('~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data/')
+```
+
+## Simulate some data
+
+First, let's create two samples, each N = 50, but one with a mean of 0 (sd = 3) and a second with a mean of 3 (sd = 5).
+
+```{r Simple Data Simulation}
+#create samples
+sample.1 <- rnorm(50, 0, 3)
+sample.2 <- rnorm(50, 3, 5)
+
+#we need a pooled data set for estimating parameters in the prior.
+pooled <- c(sample.1, sample.2)
+
+par(mfrow=c(1, 2))
+hist(sample.1)
+hist(sample.2)
+```
+
+## Traditional t-test
+
+The traditional independent-samples t-test can be conducted using $lm()$ by concatenating the data into a single column and adding a second column that codes for the "group" variable.
+
+```{r traditional t-test}
+
+# Create a "group" variable and combine the groups
+group <- c(rep(0,length(sample.1)), rep(1, length(sample.2)))
+DV <- c(sample.1, sample.2)
+
+# Put these two new variables into a dataframe and make sure group is a factor
+rawData <- data.frame(group = group, DV = DV)
+rawData$group <- as.factor(rawData$group)
+
+# Run the t-test
+ttest <- lm(DV ~ group, data = rawData)
+summary(ttest)
+
+```
+
+## Bayesian background
+
+There are lots of different ways of operationalizing this. The basic idea is to calculate the _posterior probability of the null_, i.e., that both samples are drawn from the same population, based on the likelihood of the data and the prior probability:
+
+$$ P(H0 | Data) = P(Data | H0) * P(H0) / P(Data) $$
+
+We can calculate the likelihood, i.e., $P(Data | H0)$, based on the parameters of the null, that is a standard deviation with a mean of 0 and a sd of 3. What is the probability of getting _this sample_ given that mean?
+
+Similarly, we can calculate the prior on the hypothesis, $P(H0)$ using the likelihood of the obtained sample means from the combined population. In other words, how likely is it that there is just one population?
+
+Through a trick of modern computation, the bottom part ("marginal", or $P(Data)$) drops out and we only need to worry about the likelihood and the prior. 
+
+```{r Likelihood and Prior}
+
+parameters_H0 <- c(0,3,0,3)
+
+# This function computes the likelihood of drawing the observed samples from distributions with mu1/sd1 and mu2/sd2, that is, P(Data | Hyp). We can look at the likelihood of H0 using the right set of parameters.
+
+likelihood <- function(parameters){
+  mu1=parameters[1]; sig1=parameters[2]; mu2=parameters[3]; sig2=parameters[4]
+  prod(dnorm(sample.1, mu1, sig1)) * prod(dnorm(sample.2, mu2, sig2))
+}
+
+# This function computes the probability of two sample means mu1 and mu2 given the totality of the data, i.e., the P(hypothesis). Note that these are fairly _uninformative priors_ because they're assuming a very very large standard deviation. The implication is that the prior probability of both hypotheses will be approximately equal.
+
+prior <- function(parameters){
+  mu1=parameters[1]; sig1=parameters[2]; mu2=parameters[3]; sig2=parameters[4]
+  dnorm(mu1, mean(pooled), 1000*sd(pooled)) * dnorm(mu2, mean(pooled), 1000*sd(pooled)) * dexp(sig1, rate=0.1) * dexp(sig2, 0.1)
+}
+
+prior(parameters_H0)
+```
+
+Now we can calculate the _posterior_ probability, $P(H0 | Data)$, as the product of the _prior_ probability, $P(H0)$ times the likelihood of the data under the null, $P(Data | H0)$.
+
+```{r posterior probability}
+
+parameters_H0 <- c(0,3,0,3)
+
+# The insight here is that the post
+
+posterior <- function(parameters) {
+  prior(parameters) * likelihood(parameters)
+}
+
+posterior(parameters_H0)
+
+```
+
+We can use these same functions to look at the prior and posterior on H1: samples that are about 2 units apart:
+
+```{r What about H1?}
+
+parameters_H1 <- c(0, 3, 2, 3)
+
+prior(parameters_H1)
+posterior(parameters_H1)
+
+```
+
+What is the Bayes factor (approx)? Well, it should be like an odds ratio: how much do the priors change under H0 versus H1? We'll call it the relative ratio for now.
+
+```{r Relative Ratio}
+
+H1_odds_ratio <- posterior(parameters_H1) / prior(parameters_H1)
+H0_odds_ratio <- posterior(parameters_H0) / prior(parameters_H0)
+
+RR <- H1_odds_ratio / H0_odds_ratio
+RR
+
+```
+
+## Bayesian t-test
+
+Let's see if we can do this with some package or another. Here, I'm using `BayesFactor`
+
+```{r BayesFactor package}
+
+ttestBF(formula = DV~group, data = rawData)
+
+## Sample from the corresponding posterior distribution
+samples = ttestBF(formula = DV~group, data = rawData,
+           posterior = TRUE, iterations = 10000)
+plot(samples[,"mu"])
+
+
+```
+
+## Bayesian regression
+
+Now we can use the `regressionBF()` function to run a regression. Let's look at the data we used from the midterm, predicting comfort with statistics with the number of courses taken and the anxiety level you feel about stats.
+
+```{r Old Fashioned Regression}
+
+survey <- read.csv("~/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Exams/Midterm/First_day_survey.csv", sep=",")
+
+# Pull out the relevant variables
+survey.c <- survey %>%
+  select(Comfort, nStatsCourses, Anxiety) %>%
+  na.omit()
+
+# Center the continuous predictor
+survey.c$nStatsCoursesC <- as.numeric(survey.c$nStatsCourses - mean(survey.c$nStatsCourses))
+survey.c$AnxietyC <- as.numeric(survey.c$Anxiety - mean(survey.c$Anxiety))
+
+ContCat <- lm(Comfort ~ nStatsCoursesC*AnxietyC, data = survey.c)
+summary(ContCat)
+```
+
+```{r Bayesian Regression}
+# Now let's look at the Bayesian version
+
+bayesReg <- generalTestBF(formula = Comfort ~ nStatsCoursesC*AnxietyC, data = survey.c)
+summary(bayesReg)
+
+```
+
+OK, so what this is doing is comparing each model to an H0 model with the interecept only. In other words, is each of those four models above better than a model with no predictors: lm(Comfort ~ 1). That is a bit trivial. What if we want to compare the models to each other?
+
+The `head()` function orders the models from highest to lowest BF.
+
+You can also use a feature of the `head()` function to compare them to each other.
+
+```{r Comparing Models}
+
+# Show the models rank ordered by BF
+head(bayesReg)
+
+# Compare the models to each other
+head(bayesReg / max(bayesReg))
+
+# Directly compare the top two models
+bayesReg[3] / bayesReg[2]
+
+```
+
+In other words, the best model (nStatsCourses + Anxiety) is better than the next-best model (Anxiety only) by a Bayes factor of ~ 4.6 / 1.

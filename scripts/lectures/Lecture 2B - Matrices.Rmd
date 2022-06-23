@@ -1,0 +1,376 @@
+---
+title: "Lecture 4"
+author: "ETB"
+date: "4/7/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(matlab)
+require(ggplot2)
+```
+
+## Overview
+
+To run the code in this file, rather than copying and pasting in the console, put your cursor on the line you want to run and hit Command Enter (on a Mac) or Control Enter on PC. If you want to run multiple lines of code at once, you can highlight those lines and use the keyboard shortcut.
+
+## General data manipulation
+
+```{r data manipulation}
+
+# Basic arithmetic
+2+3
+
+# Follows order of operations
+(2^3)+4*(5/3)
+
+# Basic R Functions
+x = 5 # when X is equal to a single number
+
+sin(x)
+cos(x)
+sqrt(x)
+mean(x) # doesn't actually mean anything for a single number, let's use more than 1 number!
+
+x = 1:5  # now x equals the numbers 1 thru 5
+sin(x)   # note that it does this operation on each of the values
+cos(x)
+sqrt(x)
+
+# Useful stats functions
+mean(x)   # R does these operations on the set of variables
+sd(x)
+var(x)
+max(x)
+
+# more complex operations
+z_of_x = (x-mean(x))/sd(x)
+
+```
+
+## Arrays and counting
+
+You can also create more fancy variables
+
+```{r arrays}
+
+# let's get the numbers 1 thru 10 by ones
+1:10
+
+# sequence of numbers, 1 thru 10, by 2
+s <- seq(10,1, by = -1) # can say "by=" before the 2, but it's not necessary
+
+# sequence of 11 equally spaced numbers between 0 and 1
+s2 <- seq(0,1,length.out=100) 
+
+## VARIABLES
+# create a variable
+x <- 5  # Most people prefer this one
+x = 5   # I like this because it reminds me of MATLAB
+5 -> x  # Don't do this
+x = 1:10
+
+# remove a variable
+rm(list = ls()) # now try to display x, it's gone!
+
+```
+
+## Matrices
+
+R is OK for creating and manipulating matrices
+
+```{r matrices}
+
+# can bind things together
+x <- 1:10
+y <- 11:20
+z <- c(x,y) # combines them into one vector
+z1 <- cbind(x,y) # combines them into two columns in a matrix
+z2 <- rbind(x,y) # combines them into two rows in a matrix
+
+# ...speaking of matrices
+data_for_matrix <- c(4,7,8)
+x <- as.matrix(data_for_matrix)
+
+# creating matrices
+x <- matrix(c(11,12,13,21,22,23), byrow=TRUE,nrow=2) # put into a matrix by row
+x1 <- matrix(c(11,12,13,21,22,23), byrow=FALSE,nrow=2) # put into a matrix by column
+
+# indexing matrices (getting the value that's in a particular row/column)
+# x[r,c] would give you the element in row r, column c of the matrix
+
+x[2,3] # gives you the element in row 2 column 3 of matrix x (defined above)
+x[] # all rows, all columns - could have just typed x
+x[1,] # first row, all columns
+x[ ,3] # all rows, third column
+x[1,3] # first row, third column
+ 
+# Useful shortcuts - these require the matlab package
+# might need to do this: install.packages("matlab")
+library(matlab)
+x <- ones(5) # gives you a 5x5 matrix of ones
+x
+
+x <- zeros(3) # gives you a 3x3 matrix of zeros
+x
+
+x <- eye(4) # 4x4 identity matrix
+x
+
+rando = matrix(rnorm(16), nrow = 4)
+rando
+
+x %*% rando
+
+x <- ones(5,4) # if you don't want a square matrix, can specify rows & columns
+x
+
+#here's another way to do the same thing:
+x <- matrix(rep(1,20),ncol=4)
+
+#let's make x a different matrix
+x <- matrix( c(rep(1,5), rep(0,10), rep(1,5))  , byrow=FALSE, ncol=2)
+x
+```
+
+## Matrix algebra
+
+You can also do actual matrix algebra in R
+```{r MA}
+
+library(MASS)
+library(pracma) # install.packages("pracma")
+
+# ginv = "generalized" or "pseudo" inverse
+# pseudo-inverse = (X'X)^-1 * X'
+
+ginv(x) # gives you the pseudo inverse of x
+check_ginv = inv( t(x) %*% x ) %*%  t(x)  # check that ginv actually calculates the pseudoinverse
+
+t(x) # gives the transpose of x
+
+size(x) # gives you the dimensions of x (the size function can only be used if you have the pracma or matlab packages open)
+
+df_total = size(x)[1] - 1
+
+dim(x) # alternative way to get dimensions (this is in base R and can be used w/out packages); same as "size()"
+
+rref(x) # only one piece of unique information in this matrix (not surprisingly since the rows are identical!)
+
+```
+
+## Solve the GLM with Matrix Algebra
+
+Now for the money chunk: Let's build our GLM:
+Y = Xb + b
+And solve it in R...
+
+```{r MAGLM}
+
+# This script uses the %*% notation for matrix multiplication, which is part of the Matrix package
+require(Matrix)
+
+# y is the name of the DV (by convention)
+y = c(1:10)
+```
+
+X is the design matrix. So pick ONE OF THE THREE BELOW:
+
+```{r}
+# Option 1: ANOVA matrix (ANOVA/t-test with 2 groups)
+#X = matrix(c(rep(1,5), rep(0,10), rep(1,5)), ncol=2, byrow=0)
+
+# Option 2: ANOVA matrix using less-than-full rank parameterization (i.e., what SPSS does)
+# Note: This will yield the same F, p-val, etc., as the ANOVA matrix above, but
+# the paramters mean a different thing. First param = ref group, and the second
+# param = the difference between the ref group and the other group
+X = matrix(c(rep(1,10), rep(0,5), rep(1,5)), ncol=2, byrow=0)
+X
+
+# Option 3: Regression matrix (intercept and slope)
+X = matrix(c(rep(1,10), seq(from=20, to=2, by=-2)), ncol=2, byrow=0)
+
+X
+```
+
+Now we can solve for b by doing b = inv(X)*Y
+```{r}
+# Inverse of X (actually the 'generalized' or pseudoinverse)
+invx = ginv(X)
+
+# Solve for beta using: beta = X^(-1) * y
+beta = ginv(X) %*% y
+beta
+
+# The model part of the GLM equation (Y = Xb + e), Xb
+model = X %*% beta
+model
+
+# The error part of the GLM equation (Y = Xb + e), e
+e = y - model
+e
+
+```
+
+So now we have all the variables: Y, X, b, and e. We can do actual stats!
+
+```{r}
+
+# Sum-of-squares error = e'e, or "t(e)" times e
+ss_e = t(e) %*% e
+ss_e
+
+# Sum-of-squares model = model'model, after subtracting the mean of the DV
+ss_m = t(model-mean(y)) %*% (model-mean(y))
+ss_m
+
+# Degrees-of-freedom error is the number of rows - number of columns (r-c) of the design matrix
+df_total = size(X,1) - 1
+df_e = size(X,1) - size(X,2)  # the "size" function of a matrix wants the matrix (X) and row (1) or column (2) = # rows - # columns
+df_e
+
+# Degrees-of-freedom model is the number of columns in X (equivalent to # of rows in the betas) minus 1 = # columns - 1
+df_m = size(X,2) - 1
+df_m
+
+# Mean-squared error = sum-of-squares error divided by degrees-of-freedom error
+# Conceptually: the total amount of error variance divided by the unique number of pieces of information that went into calculating that sum
+ms_e = ss_e / df_e
+ms_e
+
+# Mean-squared model = sum-of-squares model divided by degrees-of-freedom model
+# Conceptually: the total amount of model variance divided by the unique number of pieces of information that went into calculating that sum
+ms_m = ss_m / df_m
+ms_m
+
+# F is a signal-to-noise ratio where signal = mean-squared model and noise = mean-squared error
+F = ms_m / ms_e
+F
+
+# p-value is the probability of obtainining an F-value of "F" or greater from a F-distribution
+# arguments are f, df_m, df_e, and whether to take the P(F>f) [lower.tail=FALSE] or P(F<f) [lower.tail=TRUE]
+pval = pf(F, df_m, df_e, lower.tail = FALSE)
+pval
+
+```
+
+## Putting it all together: simple bootstrapping using matrices
+
+Now that we know how to parse the variance into "model" and "error" bits, we can use what we learned last time about simulation to _empirically derive_ the sampling distribution of our sum-of-squares error. Here's how:
+
+Above, we derived our sum-of-squares error in the following steps:
+
+1. Starting with the GLM, $Y = Xb + e$.
+2. Solving for $b$ by assuming $e = 0$ then "dividing" both sides by X: $X^{-1}Y = b$.
+3. Solving for $e$ using: $Y - Xb = e$.
+4. Calculating the sum-of-squares by multiplying $e$ times its transpose: SS-e = $e'e$.
+
+Using this procedure, we decided that our observed sum-of-squares error was 20. 
+
+*NOW*, we want to know if that is a lot or a little. To decide, we compared the ratio of what our model explained to what was left over ("residual") to a known distribution, $F$. But suppose this parameter didn't follow a known distribution or that we didn't know what it was. Could we still know how big or small the SS-e was? How?
+
+The answer is _bootstrapping_. In this method, we compare our observed parameter (SS-e of 20) to the distribution of observations that would have happened by chance under the null hypothesis, $H_0$. 
+
+What is the null hypothesis? It is that the observations from the two groups are drawn from _the same underlying distribution_, so their true means are expected to be equal.
+
+Here's the key insight: under the null, _the distinction between the groups is meaningless_. If all the observations are drawn from the same underlying distribution, then it doesn't matter which observation gets assigned to Group 1 and which to Group 2. This is the premise of bootstrapping.
+
+So how does this work in practice? Bootstrapping has essentially two steps. First is to calculate the parameter (in this case, SS-e) as you normally would. Then, the second step is to _assume the null is true_, shuffle the group assignment, and calculate the paramter a bunch of times to build a distribution. Here's an example:
+
+```{r Simple bootstrap}
+
+observed_sse = 20
+iter = 100000
+X = matrix(c(rep(1,5), rep(0,10), rep(1,5)), nrow = 10, byrow=FALSE)
+
+# initiate the SS-e storage vector
+ss_e_null = NULL
+
+for (i in 1:iter) {
+  
+  y_shuffle = sample(y, replace=TRUE)
+  b_shuffle = ginv(X) %*% y_shuffle
+  e_shuffle = y_shuffle - X %*% b_shuffle
+  
+  ss_e_null[i] = t(e_shuffle) %*% e_shuffle
+}
+
+```
+
+Now that we have our distribution of sums-of-squares error ("sum-of-squares errors?"), we can figure out where our observed value of 20 falls. We can do this visually with a histogram, and also quantitatively with the `ecdf` function. 
+
+```{r Plotting and calculating the percentile}
+
+# Put the data into a dataframe
+df = data.frame(ss_e_null)
+
+# Use ggplot to plot the histogram
+p<-ggplot(df, aes(x=ss_e_null)) + 
+  geom_histogram(color="black", fill="aquamarine1", binwidth=2, bins=30) +
+  xlab("Observed sum-of-squares error") +
+  ylab("Count of observations /(out of 1000/)") +
+  geom_vline(aes(xintercept=observed_sse), color="blue",  linetype="dashed", size=1)
+p
+
+# use the "empirical sampling distribution" function to figure out the distribution of the ss_e vector
+ss_e_cdf = ecdf(ss_e_null)
+p_ss_e_obs = ss_e_cdf(observed_sse)
+
+print(paste("The probability of drawing an SS_e equal to or lower than the observed is",p_ss_e_obs))
+
+plot(ss_e_cdf)
+
+p2 = ggplot(NULL, aes(x=ss_e_null)) +
+  geom_step(stat="ecdf") +
+  labs(x= "Sum-of-squared error",y = "Cumulative probability") + 
+  geom_vline(aes(xintercept=observed_sse),linetype = "dashed")
+p2
+```
+
+What if we wanted to bootstrap the F distribution?
+
+```{r F bootstrap}
+
+observed_sse = 20
+observed_ssm = 62.5
+observed_F = 25
+iter = 100000
+X = matrix(c(rep(1,5), rep(0,10), rep(1,5)), nrow = 10, byrow=FALSE)
+
+# initiate the F storage vector
+F_null = NULL
+
+for (i in 1:iter) {
+  
+  y_shuffle = sample(y, replace=TRUE)
+  b_shuffle = ginv(X) %*% y_shuffle
+  e_shuffle = y_shuffle - X %*% b_shuffle
+  m_shuffle = X %*% b_shuffle
+  
+  ss_e_null = t(e_shuffle) %*% e_shuffle
+  ss_m_null = t(m_shuffle-mean(y)) %*% (m_shuffle-mean(y))
+  
+  ms_e_null = ss_e_null / df_e
+  ms_m_null = ss_m_null / df_m
+  
+  F_null[i] = ms_e_null / ms_m_null
+}
+
+df = data.frame(F_null)
+
+# Use ggplot to plot the histogram
+p<-ggplot(df, aes(x=F_null)) + 
+  geom_histogram(color="black", fill="aquamarine1", binwidth=2, bins=30) +
+  xlab("Observed F") +
+  ylab("Count of observations /(out of 1000/)") +
+  geom_vline(aes(xintercept=observed_F), color="blue",  linetype="dashed", size=1)
+p
+
+
+```

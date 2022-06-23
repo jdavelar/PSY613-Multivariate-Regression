@@ -1,0 +1,711 @@
+---
+title: "PSY 613, Spring 2021: Lab 1 - Matrix Algebra"
+output: 
+  html_document: 
+    fig_caption: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 3
+    toc_float: TRUE
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+Today we'll be reviewing the matrix algebra operations that Elliot covered in class, as well as how to work with matrices in R. A lot of this can be done in base R, but we'll still work with the `tidyverse` a bit, and we'll also use the `MASS` and `pracma` packages. MASS comes with fresh installs of R (part of the *system library*) so you shouldn't need to install it, but you will need to load it. `pracma` will need to be installed; we need it for the row echelon form function `rref()`.
+
+```{r libs, message = FALSE, warning = FALSE}
+# uncomment if you don't have the pracma package
+# install.packages("pracma")
+library(tidyverse)
+library(pracma)
+library(MASS)
+```
+
+__Notation and Terminology:__
+
+$a_{rc}$ refers to the entry at row $r$ and column $c$ in matrix $a$.  
+"Order" refers to the dimensions of a matrix: the number of rows and the number of columns $(r,c)$.
+
+# Types of Matrices
+
+1. Rectangular: $r \neq c$  
+\[ A = \begin{bmatrix}
+1 & 5 & 7 \\
+2 & 1 & 2
+\end{bmatrix} \]
+
+2. Square:  $r = c$  
+\[ a = \begin{bmatrix}
+2 & 9\\
+4 & 6
+\end{bmatrix} \]
+
+3. Vector:  A matrix where the row or column (not both) is 1.  
+\[ A = \begin{bmatrix}
+5 & 6 & 9
+\end{bmatrix} \]
+
+4. Diagonal:  A square matrix where all of the elements equal zero except for those making up the principal diagonal.  
+\[ A = \begin{bmatrix}
+1 & 0 & 0 \\
+0 & 4 & 0 \\
+0 & 0 & 3
+\end{bmatrix} \]
+
+5. Identity:  The diagonal matrix with 1s along the principal diagonal.  
+\[ A = \begin{bmatrix}
+1 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 \\
+0 & 0 & 1 & 0 \\
+0 & 0 & 0 & 1
+\end{bmatrix} \]
+
+6. Null:  A matrix that consists entirely of 0s.  
+\[ 0 = \begin{bmatrix}
+0 & 0 & 0 \\
+0 & 0 & 0
+\end{bmatrix} \]
+
+# Equality
+
+Two matrices are equal if:   
+1. they are of the same order (i.e., have the same dimensions)    
+2. all elements in corresponding positions (e.g., $a_{11}$ & $b_{11}$) are the same.   
+
+Which of the matrices below are equal to one another?
+
+
+\[ A = \begin{bmatrix}
+1 & 2 & 3 \\
+1 & 2 & 3
+\end{bmatrix}\  
+B = \begin{bmatrix}
+1 & 1 \\
+2 & 2 \\
+3 & 3
+\end{bmatrix}\ 
+C = \begin{bmatrix}
+1 & 1 \\
+2 & 2 \\
+3 & 3
+\end{bmatrix}
+\]
+
+## Testing Equality in R
+
+We can use R to test for the equality of matrices. We'll do this by specifying these four matrices in R and checking our work. We can do this in R by using the `matrix()` function. To specify a matrix using the `matrix()` function, we need to provide the `data` (i.e., the elements, or numbers in the matrix), the number of rows (`nrow`), the number of columns (`ncol`), and then tell it whether the order of elements is entered `byrow` or not. If you're entering it row-wise, you want to set `byrow = TRUE`. If you're entering it column wise, you want to set `byrow = FALSE`.
+
+### Specify matrices
+
+```{r equality_1_spec_marices}
+a_mat <- matrix(data = c(1, 2, 3, 
+                         1, 2, 3), 
+                nrow = 2, ncol = 3, byrow = TRUE) # spacing is irrelevant
+                                                  # but I find it easier to read
+print(a_mat)
+
+b_mat <- matrix(data = c(1, 1, 
+                         2, 2, 
+                         3, 3), 
+                nrow = 3, ncol = 2, byrow = TRUE) 
+print(b_mat)
+
+c_mat <- matrix(data = c(1, 1,
+                         2, 2, 
+                         3, 3), 
+                nrow = 3, ncol = 2, byrow = TRUE) 
+print(c_mat)
+```
+
+### Test for Equality
+
+Next, we'll Check if the order is the same using a combination of `dim()`, which returns the dimensions of the matrix (rows, columns) and the equality test `==`. REMEMBER: `=` is to define things (arguments in functions & objects) and `==` tests for equality. 
+
+We get two results for each test, which correspond to (in order):     
+1. same number of rows?    
+2. same number of columns?    
+
+First let's check A against the others
+```{r equality_2_a}
+# check a against the others
+dim(a_mat) == dim(b_mat)
+dim(a_mat) == dim(c_mat)
+```
+
+As we knew (from looking at them ourselves), a is not the same shape as b and c.
+
+Next we'll check B against C:
+
+```{r equality_2_b}
+# Check B against C and D.
+dim(b_mat) == dim(c_mat)
+```
+
+
+The dimensions of B and C are the same, so let's test the equality of the elements.
+```{r equality_2_c}
+b_mat == c_mat
+```
+
+B and C are equal (as expected).
+
+# Transpose
+
+Transposing a matrix consists of exchanging the row and column for each element in the matrix.
+
+__Example:__
+
+\[ A = \begin{bmatrix}
+1 & 2 \\
+5 & 1 \\
+7 & 2
+\end{bmatrix} = \begin{bmatrix}
+1_{11} & 2_{12} \\
+5_{21} & 1_{22} \\
+7_{31} & 2_{32}
+\end{bmatrix} \]
+
+To create the transpose, the following happens:
+
+$1_{11} \rightarrow 1_{11}$
+
+$5_{21} \rightarrow 5_{12}$
+
+$7_{31} \rightarrow 7_{13}$
+
+$2_{12} \rightarrow 2_{21}$
+
+$1_{22} \rightarrow 1_{22}$
+
+$2_{32} \rightarrow 2_{23}$
+
+Since the order of the above matrix is 3x2, what will the order of its transpose be?  
+\[ A' = \begin{bmatrix}
+1 & 5 & 7 \\
+2 & 1 & 2
+\end{bmatrix} \]
+
+## Transpose in R
+
+To transpose in R, just use the function `t()`. Let's take a look at the transpose of matrix C
+```{r transpose}
+a_mat <- matrix(data = c(1, 2, 
+                         5, 1,
+                         7, 2), 
+                nrow = 3, ncol = 2, byrow = TRUE) # spacing is irrelevant
+                                                  # but I find it easier to read
+print(a_mat)
+t(a_mat)
+```
+
+
+# Addition/subtraction
+
+You can only add/subtract matrices if they have the same **________?**.
+
+\[ A=\begin{bmatrix}
+6 & 1 \\
+2 & 10 
+\end{bmatrix},  
+B=\begin{bmatrix}
+2 & 1 \\
+1 & 6 
+\end{bmatrix},  
+C=\begin{bmatrix}
+4 & 1 \\
+3 & 2 
+\end{bmatrix}
+\]
+
+1. $A+B=?$    
+2. Is the following statement true?  $A + B = B + A$   
+3. Is the following statement true?  $(A + B) + C = A + (B + C)$     
+4. $A - B = ?$     
+5. Is the following statement true?  $A - B = B - A$     
+6. Is the following statement true?  $(A - B) - C = A - (B - C)$     
+
+Try the above problems in R using `+`, `-`, and `==`.
+```{r}
+a_mat <- matrix(data = c(6, 1,
+                         2, 10),
+                nrow = 2, ncol = 2, byrow = TRUE)
+
+b_mat <- matrix(data = c(2, 1,
+                         1, 6), 
+                nrow = 2, ncol = 2, byrow = TRUE)
+
+c_mat <- matrix(data = c(4, 1,
+                         3, 2), 
+                nrow = 2, ncol = 2, byrow = TRUE)
+```
+
+```{r}
+a_mat + b_mat
+```
+
+```{r}
+a_mat + b_mat == b_mat + a_mat
+```
+
+```{r}
+(a_mat + b_mat) + c_mat == a_mat + (b_mat + c_mat)
+```
+
+```{r}
+a_mat - b_mat
+```
+
+```{r}
+a_mat - b_mat == b_mat - a_mat 
+```
+
+```{r}
+(a_mat - b_mat) - c_mat == a_mat - (b_mat - c_mat) 
+```
+
+# Multiplication
+
+Two matrices are "conformable for multiplication" if they have dimensions allowing them to be multiplied (i.e. if the inner dimensions match).
+
+## Example 1:
+\[ A=\begin{bmatrix}
+1 & 2 \\
+3 & 2 \\
+4 & 1
+\end{bmatrix},
+B=\begin{bmatrix}
+2 & 3 & 4 \\
+1 & 2 & 4 
+\end{bmatrix}\]
+
+1. What is the order of $A$? And what about $B$?    
+2. Is $AB$ conformable?     
+3. is $BA$ conformable?    
+4. For $AB$, what will the order of the resulting matrix be?
+5. Does $AB = BA$?  In other words, does the matrix product possess the commutative property?     
+
+
+\[AB=\begin{bmatrix}
+(1 \times 2)+(2 \times 1) & (1 \times 3)+(2 \times 2) & (1 \times 4)+(2 \times 4) \\
+(3 \times 2)+(2 \times 1) & (3 \times 3)+(2 \times 2) & (3 \times 4)+(2 \times 4) \\
+(4 \times 2)+(1 \times 1) & (4 \times 3)+(1 \times 2) & (4 \times 4)+(1 \times 4)
+\end{bmatrix}
+\]
+
+\[AB=\begin{bmatrix}
+4 & 7 & 12 \\
+8 & 13 & 20 \\
+9 & 14 & 20
+\end{bmatrix}
+\]  
+
+## Matrix multiplication in R
+
+To multiply matrices in R, we have to use the matrix multiplication operator, `%*%` (potentially helpful mnemonic: it sort of looks like an M). Let's check that last example using R.
+
+```{r multiplication}
+# specify a
+a_mat <- matrix(data = c(1, 2, 
+                         3, 2, 
+                         4, 1), 
+                nrow = 3, ncol = 2, byrow = TRUE) 
+# specify b
+b_mat <- matrix(data = c(2, 3, 4, 
+                         1, 2, 4), 
+                nrow = 2, ncol = 3, byrow = TRUE)
+# multiply
+a_mat %*% b_mat
+```
+
+**Try this:** What happens if we use `*` instead?
+
+```{r eval = FALSE}
+a_mat * b_mat
+```
+
+What happens if they are the exact same dimensions?
+
+```{r}
+a_mat * a_mat
+```
+
+**Q:** Can you tell what it's doing when we run `a_mat * a_mat`?    
+**A:**     
+
+## Multiplying by the Identity Matrix
+### Example
+\[ C=\begin{bmatrix}
+2 & 5 \\
+4 & 3
+\end{bmatrix}
+\]
+
+1. If C is multiplied by its identity matrix ($I_{2}$), what will the resulting matrix be?        
+2. Does $CI_{2} = I_{2}C$?     
+
+### Identity Matrix in R
+
+The simplest way to get an identity matrix in R is to use `diag(x)` where x is the number of columns or rows you want the identity matrix to have.
+
+First we'll create a matrix C.
+```{r identity_1}
+c_mat <- matrix(data = c(2, 5,
+                         4, 3), 
+                nrow = 2, ncol = 2, byrow = TRUE)
+print(c_mat)
+```
+
+And next we can get the identity matrix for C, or $I_2$
+```{r identity_2}
+id_mat <- diag(ncol(c_mat))
+# Equivalently, 
+#id_mat <- diag(2)
+print(id_mat)
+```
+
+And finally, multiply them together with `%*%`
+```{r}
+c_mat %*% id_mat
+```
+
+And we could test if $CI_2 = I_2C$ 
+```{r}
+c_mat %*% id_mat == id_mat %*% c_mat
+```
+
+# Inverse
+
+The inverse of a matrix, $A$, is the matrix that returns the identity matrix when multiplied by $A$. In other words, $AA^{-1} = I$
+
+For certain matrices, you can calculate the inverse by hand.  
+
+#### Example 1: A 2x2 matrix   
+\[A=\begin{bmatrix}
+a & b  \\
+c & d  
+\end{bmatrix}
+\]
+
+\[A^{-1}=\frac{1}{ad-bc}\begin{bmatrix}
+d & -b  \\
+-c & a  
+\end{bmatrix}
+\]
+
+\[A^{-1}=\begin{bmatrix}
+d/(a*d-b*c) & -b/(a*d-b*c)  \\
+-c/(a*d-b*c) & a/(a*d-b*c)  
+\end{bmatrix}
+\]
+
+What does $A^-1$ equal?
+\[A=\begin{bmatrix}
+3 & 2  \\
+2 & 4  
+\end{bmatrix}
+\]
+
+\[A=\begin{bmatrix}
+4/(3*4 - 2*2) & -2/(3*4 - 2*2)  \\
+-2/(3*4 - 2*2) & 3/(3*4 - 2*2)  
+\end{bmatrix}
+\]
+
+\[A=\begin{bmatrix}
+.5 & -.25 \\
+-.25 & .375  
+\end{bmatrix}
+\]
+
+In R, you can get the inverse of a square matrix with the function `solve()`
+```{r inverse}
+a_mat <- matrix(data = c(3, 2, 
+                         2, 4), 
+                nrow = 2, byrow = TRUE)
+solve(a_mat)
+```
+
+Note that you can also use `ginv()`, which is the generalized or pseudo-inverse; `ginv()` works with non-invertible matrices whereas `solve()` works only for invertible matrices.
+
+An invertible matrix is a square matrix that, when multiplied by its inverse, results in the identity matrix. Non-square matrices are non-invertible.
+
+```{r inverse_2}
+ginv(a_mat)
+```
+
+For example, we could get the pseudo-inverse of the 2x3 rectangular matrix $B$ from above with `ginv()`:
+
+```{r}
+b_mat
+ginv(b_mat)
+```
+
+Verify that $AA^{-1} = I_{2}$
+```{r inverse_and_identity1}
+a_inv <- ginv(a_mat)
+a_mat %*% a_inv
+```
+
+Q: Did we verify that $AA^{-1} = I_{2}$?        
+
+
+# Connection Between Matrix Algebra and Linear Regression
+
+Recall that the formula for the general linear model is: $Y = XB + E$, where
+
+* Y = data on the outcome variable
+* X = data on the predictor variable(s)
+* B = the model 
+* E = error 
+
+
+The model, B, is solved for by finding the values that best minimize the total sum of squared error (SSE). 
+
+Matrix algebra provides us with a formula for finding what the values to use for this best-fitting model are:
+
+$B = X^{-1}*Y$ 
+
+where $X^{-1} = (X'X)^{-1}X'$
+
+so you could also write B as:
+
+$B = (X'X)^{-1}X'Y$
+
+If you are interested in how the matrix formula for B that best minimizes SSE is solved for, you can [check out pages 4-5 of this explanation here!](https://www.stat.purdue.edu/~boli/stat512/lectures/topic3.pdf)
+
+
+Let's do an example where we have the data collected on our outcome variable, Y, and the data on our predictor variable, X. In this example, like the example we did in class, the X variable mimics the way the data would be set up for a two-sample ANOVA because it indicates whether people were in Group 1 or Group 2. 
+```{r}
+Y <- matrix(data = c(1:10), nrow = 10, ncol = 1, byrow = TRUE)
+Y
+
+X <- matrix(data = c(1, 0,
+                     1, 0,
+                     1, 0,
+                     1, 0,
+                     1, 0,
+                     0, 1,
+                     0, 1,
+                     0, 1,
+                     0, 1,
+                     0, 1), 
+                nrow = 10, ncol = 2, byrow = TRUE)
+
+X
+```
+
+Solve for B.
+
+$B = X^{-1}*Y$ 
+
+Rememebr to solve for the inverse, we can use the built-in R function `ginv()`.
+
+```{r}
+B <- ginv(X) %*% Y
+B
+```
+
+Notice these are equal to the means of Group 1 and Group 2.
+```{r}
+mean(1:5)
+mean(6:10)
+```
+
+
+How does this translate to the regression equation?
+
+$Y' = XB$
+
+Predicted scores on the outcome variable, Y', are equal to scores on X times the model parameters we just solved for.
+
+```{r}
+Y_pred <- X %*% B
+Y_pred
+```
+
+In other words, our model predicts a score of 3 for the people in Group 1 and a score of 8 for the people in Group 2.
+
+We can use these predicted values to solve for our error matrix. Subtract people's actual scores from the score predicted by the model to see how much the model is 'off' by (aka, how much is leftover unaccounted for by our model).
+
+$E = Y - Y'$
+
+```{r}
+E <- Y - Y_pred
+E
+```
+
+And solve for SSE.
+
+$SSE = E'E$
+
+```{r}
+SSE <- t(E) %*% E
+SSE
+```
+
+
+# Linear Independence 
+
+Determining whether the rows of a matrix are linearly independent is important because the inverse can only be solved for when the rows are linearly independent. This means the regression parameters contained in matrix B can only be solved for if the rows of X are linearly independent (because we use the inverse of X to solve for B). If the rows of your matrix, X, have linear dependence, this suggests issues with multicollinearity that you have to account for.
+
+## Reduced Row Echelon Form
+
+Reduced Row Echelon Form tells you the number of linearly independent rows in a matrix. The rank of a matrix is the number of linearly independent rows it has. For example, a row rank of 2 means that 2 rows are independent.
+
+* In order for a matrix to be in reduced echelon form:
+  + The first non-zero number in each row, from the left, must be a 1
+  + The 1 in subsequent rows must be to the right of the 1 in the row above it
+  + The values following the 1 in each row should be 0s
+
+* Operations you can use to convert a matrix to reduced echelon form:
+  + Interchange one row with another
+  + Multiply a row by a scalar (i.e., a single number)
+  + Add or subtract one row from another
+
+or a combination of these. For example, you could do $Row1 = Row1 - 4*Row3$
+
+\[A=\begin{bmatrix}
+1 & 2 & 5 & 4 \\
+3 & 2 & 4 & 3 \\
+6 & 4 & 8 & 6 \\
+2 & 2 & 8 & 1
+\end{bmatrix}
+\]
+
+Q: What is the row rank of A above?   
+A:
+
+__Basic algorithm__
+
+* Using row operations:
+    + Make $a_{11}$ = 1
+    + Make remaining entries in column 1 be zeros
+    + Make $a_{22}$ = 1
+    + Make remaining entries in column 2 be zeros
+
+...continue this
+
+
+__What is the row echelon form of $A$?__   
+
+*Step 1:* Make the entry in R1 and C1 (1,1) into 1.   
+Already done!   
+
+*Step 2:* Make the remaining elements in C1 into 0.    
+
+- For R2: Subtract 3*R1 from R2. In other words, multiply R1 by 3, and then subtract those elements to the corresponding elements in R2.
+    - New R2: 0, -4, -11, -9
+    
+- For R3: Subtract 6*R1 from R3.
+    - New R3: 0, -8, -22, -18
+    
+- For R4: Subtract 2*R1 from R4.
+    - New R4: 0, -2, -2, -7    
+
+\[A=\begin{bmatrix}
+1 & 2 & 5 & 4 \\
+0 & -4 & -11 & -9 \\
+0 & -8 & -22 & -18 \\
+0 & -2 & -2 & -7
+\end{bmatrix}
+\]
+
+*Step 3:* Make the entry in (2,2) into 1.
+
+- Multiply R2 by -1/4.
+
+\[A=\begin{bmatrix}
+1 & 2 & 5 & 4 \\
+0 & 1 & 11/4 & 9/4 \\
+0 & -8 & -22 & -18 \\
+0 & -2 & -2 & -7
+\end{bmatrix}
+\]
+
+*Step 4:* Make the remaining elements in C2 into 0.
+
+- For R1:Subtract 2*R2 from R1
+    - New R1: 1, 0, -1/2, -1/2
+- For R3: Add 8*R2 to R3
+    - New R3: 0, 0, 0, 0
+- For R4: Add 2*R2 to R4
+    - New R4: 0, 0, 7/2, -5/2    
+
+\[A=\begin{bmatrix}
+1 & 0 & -1/2 & -1/2 \\
+0 & 1 & 11/4 & 9/4 \\
+0 & 0 & 0 & 0 \\
+0 & 0 & 7/2 & -5/2
+\end{bmatrix}
+\]
+
+Uh-oh. $a_{33}$ is 0, which means there's nothing we could multiply  that row by to get a 1 in that spot! **This indicates that there's at least one row in this matrix that is not independent.** 
+
+What now? We have one more row to deal with, so *swap the row of zeros down to the end,* and then continue the algorithm. Remember, all we're testing is how many rows are independent, so the order of the rows doesn't matter.
+
+*Step 5:* Swap R3 and R4 to move the zeros to the bottom.
+
+\[A=\begin{bmatrix}
+1 & 0 & -1/2 & -1/2 \\
+0 & 1 & 11/4 & 9/4 \\
+0 & 0 & 7/2 & -5/2 \\
+0 & 0 & 0 & 0
+\end{bmatrix}
+\]
+
+*Step 6:* Make the entry in (3,3) into 1.
+
+- Multiply R3 by 2/7.
+
+\[A=\begin{bmatrix}
+1 & 0 & -1/2 & -1/2 \\
+0 & 1 & 11/4 & 9/4 \\
+0 & 0 & 1 & -10/14 \\
+0 & 0 & 0 & 0
+\end{bmatrix}
+\]
+
+*Step 7:* Make the remaining elements in C3 into 0.
+
+- For R1: Add (1/2)*R3 to R1
+    - New R1: 1, 0, 0, -6/7
+- For R2: Subtract (11/4)*R3 from R2
+    - New R2: 0, 1, 0, 59/14
+- For R4: Already done!
+
+\[A=\begin{bmatrix}
+1 & 0 & 0 & -6/7 \\
+0 & 1 & 0 & 59/14 \\
+0 & 0 & 1 & -10/14 \\
+0 & 0 & 0 & 0
+\end{bmatrix}
+\]
+
+Note that this process is designed to tell you *how many* independent rows there are, not how individual rows are related to each other. 
+
+For example, you don't know from the above calculations that **R3 from the original matrix is the one that's not independent.** In fact, that's not really the case: you can see from carefully examining the original matrix that R3 = R2\*2, so **you could blame R2 or R3** for not being independent. By definition, independence or non-independence of a given row is relative to the other rows.    
+
+Next we'll check our work in R using the `rref()` function from the `pracma` package.
+
+```{r reduced_row_echelon}
+a_mat <- matrix(data = c(1, 2, 5, 4, 
+                         3, 2, 4, 3, 
+                         6, 4, 8, 6,  
+                         2, 2, 8, 1), 
+                nrow = 4, ncol = 4, byrow = TRUE)
+rref(a_mat)
+```
+
+If you want to display the numbers as fractions instead of decimals (to make it easier to check your by-hand work) , you can use the `fractions()` function from the `MASS` package.
+```{r reduced_row_echelon_2}
+rref(a_mat) %>% 
+  fractions()
+```
+
+
+That's it for today!
+
+Check out this quick guide to [matrix algebra functions in R](https://www.statmethods.net/advstats/matrix.html)!
+
+And also check out this walk-through of a [matrix formulation of multiple regression](https://online.stat.psu.edu/stat462/node/132/) for a recap of the concepts that we covered this week!

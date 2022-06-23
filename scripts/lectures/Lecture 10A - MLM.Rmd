@@ -1,0 +1,128 @@
+---
+title: "Lecture 19 - MLM"
+author: "ETB"
+date: "5/31/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(foreign)
+library(lme4)
+library(lmerTest)
+library(ggplot2)
+setwd("/Users/Berkman/Documents/Psychology/Oregon/Teaching/Multivariate/Spr 2022/Lecture Data")
+```
+
+## Import data
+
+```{r import}
+dataset = read.spss("Lecture18NELS88.sav", to.data.frame=TRUE)
+dataset$schooltype = factor(dataset$schooltype)
+dataset$Schoolid = factor(dataset$Schoolid)
+```
+
+## Run basic models
+
+The "null model", AKA random effects ANOVA
+Use this to compute ICC!
+
+```{r basic random effects anova}
+
+model0 = lmer(mathscore ~ 1 + (1 | Schoolid), data = dataset)
+summary(model0)
+```
+
+What is the total variance? How does this compare to the variance if we ran a disaggregated model?
+
+```{r variance comparison}
+
+model0.lm = lm(mathscore ~ 1, data = dataset)
+summary(model0.lm)
+
+#Use this to look at the variance
+anova(model0.lm)
+
+```
+
+Compute the ICC of the random effects model
+```{r ICC}
+as.data.frame(VarCorr(model0))
+L2var <- as.data.frame(VarCorr(model0))[1,4]
+L1var <- as.data.frame(VarCorr(model0))[2,4]
+icc <- L2var/(L2var+L1var)
+icc
+```
+
+MLM with random intercept only
+```{r random intercept only model}
+model1 = lmer(mathscore ~ 1 + timeonmath +  (1 | Schoolid), data = dataset)
+summary(model1)
+```
+
+Test for improved fit
+```{r model comparison}
+anova(model0,model1)
+```
+
+What happens if you have no random intercept and ONLY a random slope?
+```{r weird model}
+model1.weird = lmer(mathscore ~ timeonmath + (0 + timeonmath | Schoolid), data = dataset)
+summary(model1.weird)
+```
+## A brief plotting excursion
+```{r mlm plots}
+plot(dataset$timeonmath, dataset$mathscore, col=dataset$Schoolid)
+
+# Or, with ggplot:
+ggplot(dataset,aes(x=timeonmath, y=mathscore, colour=Schoolid))+
+  geom_point()+
+  facet_wrap(~Schoolid)+
+  geom_smooth(method="lm")
+```
+
+## More complex models
+
+MLM with random intercept and "time on math" slope (i.e., random coefficients regression)
+```{r RCR}
+model2 = lmer(mathscore ~ 1 + timeonmath + (1 + timeonmath | Schoolid), data = dataset)
+model2 = lmer(mathscore ~ timeonmath + (timeonmath | Schoolid), data = dataset)
+
+summary(model2)
+
+# test for improved fit over previous model with only random intercept
+anova(model1,model2)
+```
+
+Random coefficients regression with one L1 and one L2 (school-level) predictor variable
+```{r RCR with L1 and L2 predictors}
+model3 = lmer(mathscore ~ timeonmath + schooltype + (timeonmath | Schoolid), data = dataset)
+model3.compare = lmer(mathscore ~ timeonmath + schooltype + (1 | Schoolid) + (0+timeonmath|Schoolid), data = dataset)
+summary(model3)
+anova(model3,model3.compare)
+```
+
+Full random coefficients model with L1, L2, and cross-level interactions 
+```{r full model}
+model4 = lmer(mathscore ~ 1 + timeonmath + schooltype + timeonmath*schooltype + (1 + timeonmath | Schoolid), data = dataset)
+summary(model4)
+```
+
+Random coefficients model with L1, L2, and cross-level interactions, random intercept only
+```{r full model minus random slope}
+model5 = lmer(mathscore ~ timeonmath + schooltype + timeonmath*schooltype + (1 | Schoolid), data = dataset)
+summary(model5)
+
+anova(model4,model5)
+```
+
+And, just for fun, let's compare this to:
+```{r lm model}
+model6 = lm(mathscore ~ timeonmath + schooltype + timeonmath*schooltype, data = dataset)
+summary(model6)
+```
